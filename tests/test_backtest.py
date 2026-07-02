@@ -13,6 +13,23 @@ class BacktestTests(unittest.TestCase):
         self.assertIsNotNone(rows[-1]["ma"])
         self.assertIsNotNone(rows[-1]["atr"])
 
+    def test_default_strategy_uses_optimized_weekly_params(self) -> None:
+        params = StrategyParams()
+
+        self.assertEqual(params.ema_period, 15)
+        self.assertEqual(params.ma_period, 40)
+        self.assertEqual(params.adx_min, 0.0)
+        self.assertEqual(params.long_rsi_min, 35.0)
+        self.assertEqual(params.long_rsi_max, 85.0)
+        self.assertEqual(params.short_rsi_min, 0.0)
+        self.assertEqual(params.short_rsi_max, 100.0)
+        self.assertEqual(params.stop_atr, 1.8)
+        self.assertEqual(params.take_atr, 7.5)
+        self.assertEqual(params.take_atr_step, 1.25)
+        self.assertEqual(params.take_atr_max, 24.0)
+        self.assertEqual(params.take_atr_buffer_pct, 0.0)
+        self.assertEqual(params.volume_mult, 1.0)
+
     def test_backtest_returns_metrics_and_trade_list(self) -> None:
         candles = _sample_candles(120)
         result = run_backtest(candles, StrategyParams(adx_min=5, volume_mult=0.0))

@@ -9,21 +9,21 @@ from .indicators import adx, atr, bollinger, ema, macd, rsi, sma
 @dataclass(frozen=True)
 class StrategyParams:
     ema_period: int = 15
-    ma_period: int = 50
+    ma_period: int = 40
     rsi_period: int = 14
     atr_period: int = 14
     adx_period: int = 14
-    adx_min: float = 18.0
-    long_rsi_min: float = 42.0
-    long_rsi_max: float = 72.0
-    short_rsi_min: float = 28.0
-    short_rsi_max: float = 58.0
-    stop_atr: float = 2.4
-    take_atr: float = 4.2
-    take_atr_step: float = 0.0
-    take_atr_max: float = 0.0
+    adx_min: float = 0.0
+    long_rsi_min: float = 35.0
+    long_rsi_max: float = 85.0
+    short_rsi_min: float = 0.0
+    short_rsi_max: float = 100.0
+    stop_atr: float = 1.8
+    take_atr: float = 7.5
+    take_atr_step: float = 1.25
+    take_atr_max: float = 24.0
     take_atr_buffer_pct: float = 0.0
-    volume_mult: float = 0.75
+    volume_mult: float = 1.0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -7,18 +7,24 @@ from .backtest import run_backtest
 from .strategy import StrategyParams
 
 
-def optimize(candles: list[dict[str, Any]], max_results: int = 20) -> list[dict[str, Any]]:
+def optimize(
+    candles: list[dict[str, Any]],
+    max_results: int = 20,
+    start_trading_ms: int | None = None,
+) -> list[dict[str, Any]]:
     grid = {
-        "ema_period": [8, 13, 15, 21],
-        "ma_period": [34, 50, 60],
-        "adx_min": [14.0, 18.0, 22.0],
+        "ema_period": [15],
+        "ma_period": [40],
+        "adx_min": [0.0, 14.0],
         "stop_atr": [1.8, 2.4, 3.0],
-        "take_atr": [3.0, 4.2, 5.5],
-        "volume_mult": [0.6, 0.75, 0.9],
+        "take_atr": [6.5, 7.5, 8.0],
+        "take_atr_step": [1.0, 1.25],
+        "take_atr_max": [20.0, 24.0, 32.0],
+        "volume_mult": [1.0],
     }
     rsi_profiles = [
-        {"long_rsi_min": 42.0, "long_rsi_max": 72.0, "short_rsi_min": 28.0, "short_rsi_max": 58.0},
-        {"long_rsi_min": 35.0, "long_rsi_max": 100.0, "short_rsi_min": 0.0, "short_rsi_max": 65.0},
+        {"long_rsi_min": 35.0, "long_rsi_max": 85.0, "short_rsi_min": 0.0, "short_rsi_max": 100.0},
+        {"long_rsi_min": 55.0, "long_rsi_max": 75.0, "short_rsi_min": 0.0, "short_rsi_max": 100.0},
     ]
     results: list[dict[str, Any]] = []
     keys = list(grid.keys())
@@ -28,7 +34,7 @@ def optimize(candles: list[dict[str, Any]], max_results: int = 20) -> list[dict[
             continue
         for rsi_profile in rsi_profiles:
             params = StrategyParams(**candidate, **rsi_profile)
-            result = run_backtest(candles, params)
+            result = run_backtest(candles, params, start_trading_ms=start_trading_ms)
             metrics = result["metrics"]
             if metrics["trade_count"] < 2:
                 continue

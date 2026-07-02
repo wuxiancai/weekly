@@ -76,11 +76,12 @@ def candles(
 
 @app.post("/api/backtest")
 def backtest(request: BacktestRequest) -> dict[str, Any]:
-    data = _load_range(request.symbol, request.interval, request.start_date, request.end_date)
+    start_ms = parse_date_ms(request.start_date)
+    data = _load_for_backtest(request.symbol, request.interval, request.end_date)
     if not data:
         raise HTTPException(400, "没有 K 线数据，请先同步 Binance 数据")
     params = params_from_dict(request.params)
-    result = run_backtest(data, params)
+    result = run_backtest(data, params, start_trading_ms=start_ms)
     run_id = insert_backtest_run(
         request.symbol.upper(),
         request.interval,
@@ -95,17 +96,18 @@ def backtest(request: BacktestRequest) -> dict[str, Any]:
         "params": params.to_dict(),
         "metrics": result["metrics"],
         "trades": [_public_trade(t) for t in result["trades"]],
-        "equity_curve": result["equity_curve"],
-        "candles": [_public_candle(row) for row in result["candles"]],
+        "equity_curve": [row for row in result["equity_curve"] if int(row["time"]) >= start_ms],
+        "candles": [_public_candle(row) for row in result["candles"] if int(row["open_time"]) >= start_ms],
     }
 
 
 @app.post("/api/optimize")
 def optimize_api(request: BacktestRequest, max_results: int = Query(20, ge=1, le=50)) -> dict[str, Any]:
-    data = _load_range(request.symbol, request.interval, request.start_date, request.end_date)
+    start_ms = parse_date_ms(request.start_date)
+    data = _load_for_backtest(request.symbol, request.interval, request.end_date)
     if not data:
         raise HTTPException(400, "没有 K 线数据，请先同步 Binance 数据")
-    results = optimize(data, max_results=max_results)
+    results = optimize(data, max_results=max_results, start_trading_ms=start_ms)
     for row in results:
         insert_optimization_result(request.symbol.upper(), request.interval, row["params"], row["metrics"])
     return {"count": len(results), "items": results}
@@ -150,6 +152,10 @@ def trades(run_id: int) -> dict[str, Any]:
 
 def _load_range(symbol: str, interval: str, start_date: str, end_date: str) -> list[dict[str, Any]]:
     return load_candles(symbol.upper(), interval, parse_date_ms(start_date), parse_date_ms(end_date))
+
+
+def _load_for_backtest(symbol: str, interval: str, end_date: str) -> list[dict[str, Any]]:
+    return load_candles(symbol.upper(), interval, None, parse_date_ms(end_date))
 
 
 def _public_candle(row: dict[str, Any]) -> dict[str, Any]:
@@ -228,17 +234,17 @@ HTML = """
 <body>
   <header>
     <h1>BTCUSDT 模拟自动交易系统</h1>
-    <div class="status" id="status">默认 EMA15 / MA50，周期 1w</div>
+    <div class="status" id="status">默认 EMA15 / MA40，周期 1w</div>
   </header>
   <main>
     <section class="toolbar">
       <label>交易对<input id="symbol" value="BTCUSDT"></label>
       <label>周期<input id="interval" value="1w"></label>
-      <label>开始日期<input id="start" value="2021-11-15"></label>
-      <label>结束日期<input id="end" value="2026-07-02"></label>
+      <label>开始日期<input id="start" value="2020-07-01"></label>
+      <label>结束日期<input id="end" value="2026-06-29"></label>
       <label>EMA<input id="ema" type="number" value="15"></label>
-      <label>MA<input id="ma" type="number" value="50"></label>
-      <label>ADX 最小<input id="adx" type="number" value="18"></label>
+      <label>MA<input id="ma" type="number" value="40"></label>
+      <label>ADX 最小<input id="adx" type="number" value="0"></label>
       <button class="primary" onclick="syncData()">同步 Binance 数据</button>
       <button onclick="runBacktest()">运行回测</button>
       <button onclick="runOptimize()">参数优化</button>

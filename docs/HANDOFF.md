@@ -66,6 +66,41 @@
   - 低回撤候选：`long_rsi=55-75, short_rsi=0-100, stop_atr=0.8, take_atr_step=1.0, take_atr_max=20, volume_mult=1.25`：收益 `1268.1879%`，最大回撤 `23.6011%`，4 笔，胜率 `100%`。
 - 注意：动态止盈与“趋势内再入场”叠加后，收益/回撤不再完全等同于此前临时模拟；趋势内再入场会增加部分 2021 或 2024 的再入场，需要重新筛参数。
 
+## 2026-07-02 默认收益最大化参数更新
+
+- 默认策略参数已更新为本轮固定 `volume_mult=1.0` 的收益最大组合：
+  - `EMA15 / MA40`
+  - `ADX >= 0`
+  - `long_rsi = 35 - 85`
+  - `short_rsi = 0 - 100`
+  - `stop_atr = 1.8`
+  - `take_atr = 7.5`
+  - `take_atr_step = 1.25`
+  - `take_atr_max = 24.0`
+  - `take_atr_buffer_pct = 0`
+  - `volume_mult = 1.0`
+- 回测 API 改为加载结束日前全部本地历史 K 线做指标预热，并用 `start_trading_ms` 限制只在用户选择开始日期后开仓；页面返回的 K 线和权益曲线仍过滤到用户选择窗口内。
+- 默认页面参数已同步为 `2020-07-01` 至 `2026-06-29`、`EMA15 / MA40`、`ADX=0`。
+- 参数优化网格已同步到当前动态止盈策略空间，固定默认 `volume_mult=1.0` 搜索，并包含 `take_atr_step`、`take_atr_max`。
+- 默认 API 回测 `BacktestRequest()` 结果：
+  - 收益率 `7057.9855%`
+  - 最大回撤 `47.1446%`
+  - 交易 `7` 笔
+  - 胜率 `100%`
+  - 逐笔：
+    - `LONG 2020-08-03 -> 2021-01-11 +240.3694% TRAIL_TAKE_PROFIT`
+    - `LONG 2021-01-25 -> 2021-11-15 +100.4495% TRAIL_TAKE_PROFIT`
+    - `SHORT 2022-02-07 -> 2023-02-27 +44.3915% REVERSE_SIGNAL`
+    - `LONG 2023-02-27 -> 2023-12-11 +78.576% TRAIL_TAKE_PROFIT`
+    - `LONG 2023-12-18 -> 2024-04-01 +70.9716% TRAIL_TAKE_PROFIT`
+    - `LONG 2024-04-15 -> 2025-07-14 +80.6315% TRAIL_TAKE_PROFIT`
+    - `SHORT 2025-12-08 -> 2026-06-29 +32.1202% END_OF_TEST`
+- 验证：
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：8 个测试通过。
+  - `python3` 直接调用 `app.main.backtest(BacktestRequest())` 已生成 `run_id=9` 并复现上述指标。
+  - `python3` 直接调用 `app.main.optimize_api(BacktestRequest(), max_results=5)`：第 1 名为默认参数，收益率 `7057.9855%`，最大回撤 `47.1446%`，7 笔。
+
 ## 启动
 
 ```bash
