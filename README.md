@@ -5,7 +5,7 @@
 ## 启动
 
 ```bash
-bash scripts/start.sh
+./start.sh
 ```
 
 打开：
@@ -23,10 +23,11 @@ http://127.0.0.1:8000
 - `Bollinger Band` 过滤极端位置。
 - `ATR` 计算止损止盈。
 - 支持做多和做空。
+- 回测使用上一根已收盘 K 线生成信号，下一根 K 线开盘成交，避免未来函数。
+- 支持 Walk-forward：训练段选参，测试段验证。
 
 ## 数据来源
 
 REST K 线使用 Binance 官方 USDⓈ-M Futures `GET /fapi/v1/klines`。
 
 WebSocket 脚本使用 kline stream：`<symbol>@kline_<interval>`。
-

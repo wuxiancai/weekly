@@ -10,6 +10,7 @@ from .strategy import StrategyParams, enrich_candles
 @dataclass
 class Position:
     side: str
+    signal_time: int
     entry_time: int
     entry_price: float
     quantity: float
@@ -24,7 +25,14 @@ def run_backtest(
     initial_equity: float = DEFAULTS.initial_equity,
     fee_rate: float = DEFAULTS.fee_rate,
     slippage_rate: float = DEFAULTS.slippage_rate,
+    start_trading_ms: int | None = None,
 ) -> dict[str, Any]:
+    """Run a no-lookahead backtest.
+
+    A signal is generated from a fully closed candle and can only be executed on
+    the next candle open. The current candle high/low may only affect positions
+    that already existed at that candle open.
+    """
     enriched = enrich_candles(candles, params)
     equity = initial_equity
     peak = initial_equity
@@ -33,32 +41,40 @@ def run_backtest(
     equity_curve: list[dict[str, float]] = []
     position: Position | None = None
 
-    for row in enriched:
+    for i, row in enumerate(enriched):
+        previous = enriched[i - 1] if i > 0 else None
         close = float(row["close"])
+        open_price = float(row["open"])
         high = float(row["high"])
         low = float(row["low"])
-        atr_value = row.get("atr")
-        signal = row["signal"]
+        action_signal = previous["signal"] if previous is not None else "HOLD"
+        signal_atr = previous.get("atr") if previous is not None else None
 
         if position is not None:
-            exit_price, exit_reason = _exit_decision(position, high, low, close, signal)
+            exit_price, exit_reason = _exit_decision(position, high, low, open_price, action_signal)
             if exit_price is not None:
                 equity, trade = _close_position(position, row["open_time"], exit_price, equity, fee_rate, slippage_rate, exit_reason)
                 trades.append(trade)
                 position = None
 
-        if position is None and signal in ("LONG", "SHORT") and atr_value:
-            entry_price = close * (1 + slippage_rate if signal == "LONG" else 1 - slippage_rate)
+        can_trade = start_trading_ms is None or int(row["open_time"]) >= start_trading_ms
+        if can_trade and position is None and action_signal in ("LONG", "SHORT") and signal_atr and previous is not None:
+            entry_price = open_price * (1 + slippage_rate if action_signal == "LONG" else 1 - slippage_rate)
             quantity = equity / entry_price
             fee = equity * fee_rate
             equity -= fee
-            if signal == "LONG":
-                stop_price = entry_price - params.stop_atr * atr_value
-                take_price = entry_price + params.take_atr * atr_value
+            if action_signal == "LONG":
+                stop_price = entry_price - params.stop_atr * signal_atr
+                take_price = entry_price + params.take_atr * signal_atr
             else:
-                stop_price = entry_price + params.stop_atr * atr_value
-                take_price = entry_price - params.take_atr * atr_value
-            position = Position(signal, int(row["open_time"]), entry_price, quantity, stop_price, take_price, equity)
+                stop_price = entry_price + params.stop_atr * signal_atr
+                take_price = entry_price - params.take_atr * signal_atr
+            position = Position(action_signal, int(previous["open_time"]), int(row["open_time"]), entry_price, quantity, stop_price, take_price, equity)
+            same_bar_exit, same_bar_reason = _exit_decision(position, high, low, open_price, "HOLD")
+            if same_bar_exit is not None:
+                equity, trade = _close_position(position, row["open_time"], same_bar_exit, equity, fee_rate, slippage_rate, same_bar_reason)
+                trades.append(trade)
+                position = None
 
         mark_equity = _mark_to_market(equity, position, close) if position else equity
         peak = max(peak, mark_equity)
@@ -126,6 +142,7 @@ def _close_position(
     final_equity = equity + pnl - fee
     trade = {
         "side": position.side,
+        "signal_time": position.signal_time,
         "entry_time": position.entry_time,
         "exit_time": exit_time,
         "entry_price": round(position.entry_price, 4),
@@ -142,4 +159,3 @@ def _mark_to_market(equity: float, position: Position, close: float) -> float:
     if position.side == "LONG":
         return equity + (close - position.entry_price) * position.quantity
     return equity + (position.entry_price - close) * position.quantity
-

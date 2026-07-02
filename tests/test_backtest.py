@@ -1,6 +1,7 @@
 import unittest
 
 from app.backtest import run_backtest
+from app.optimizer import walk_forward_optimize
 from app.strategy import StrategyParams, enrich_candles
 
 
@@ -18,6 +19,33 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("total_return_pct", result["metrics"])
         self.assertIsInstance(result["trades"], list)
         self.assertTrue(result["equity_curve"])
+
+    def test_entries_execute_after_signal_candle_to_avoid_lookahead(self) -> None:
+        candles = _sample_candles(140)
+        result = run_backtest(
+            candles,
+            StrategyParams(
+                adx_min=0,
+                volume_mult=0.0,
+                long_rsi_min=0,
+                long_rsi_max=100,
+                short_rsi_min=0,
+                short_rsi_max=100,
+                stop_atr=10.0,
+                take_atr=10.0,
+            ),
+        )
+        self.assertTrue(result["trades"])
+        for trade in result["trades"]:
+            self.assertGreater(trade["entry_time"], trade["signal_time"])
+
+    def test_walk_forward_reports_train_and_test_metrics(self) -> None:
+        candles = _sample_candles(140)
+        result = walk_forward_optimize(candles, train_ratio=0.7, max_results=3)
+        self.assertGreater(result["train_count"], result["test_count"])
+        self.assertLessEqual(len(result["items"]), 3)
+        self.assertIn("train_metrics", result["items"][0])
+        self.assertIn("test_metrics", result["items"][0])
 
 
 def _sample_candles(count: int) -> list[dict]:

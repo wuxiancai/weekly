@@ -19,7 +19,7 @@ from .db import (
     recent_optimization,
     upsert_candles,
 )
-from .optimizer import optimize
+from .optimizer import optimize, walk_forward_optimize
 from .strategy import StrategyParams, enrich_candles, params_from_dict
 from .timeutils import ms_to_date, parse_date_ms
 
@@ -111,6 +111,38 @@ def optimize_api(request: BacktestRequest, max_results: int = Query(20, ge=1, le
     return {"count": len(results), "items": results}
 
 
+@app.post("/api/walk-forward")
+def walk_forward_api(
+    request: BacktestRequest,
+    max_results: int = Query(10, ge=1, le=30),
+    train_ratio: float = Query(0.7, ge=0.5, le=0.85),
+) -> dict[str, Any]:
+    data = _load_range(request.symbol, request.interval, request.start_date, request.end_date)
+    if not data:
+        raise HTTPException(400, "没有 K 线数据，请先同步 Binance 数据")
+    try:
+        result = walk_forward_optimize(data, train_ratio=train_ratio, max_results=max_results)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    for row in result["items"]:
+        insert_optimization_result(
+            request.symbol.upper(),
+            request.interval,
+            row["params"],
+            {"train": row["train_metrics"], "test": row["test_metrics"], "score": row["score"]},
+        )
+    return {
+        "train_count": result["train_count"],
+        "test_count": result["test_count"],
+        "train_start": ms_to_date(result["train_start"]),
+        "train_end": ms_to_date(result["train_end"]),
+        "test_start": ms_to_date(result["test_start"]),
+        "test_end": ms_to_date(result["test_end"]),
+        "count": len(result["items"]),
+        "items": result["items"],
+    }
+
+
 @app.get("/api/backtests/{run_id}/trades")
 def trades(run_id: int) -> dict[str, Any]:
     return {"items": [_public_trade(t) for t in load_trades(run_id)]}
@@ -145,6 +177,8 @@ def _public_candle(row: dict[str, Any]) -> dict[str, Any]:
 
 def _public_trade(row: dict[str, Any]) -> dict[str, Any]:
     out = dict(row)
+    if out.get("signal_time") is not None:
+        out["signal_date"] = ms_to_date(int(out["signal_time"]))
     out["entry_date"] = ms_to_date(int(out["entry_time"]))
     out["exit_date"] = ms_to_date(int(out["exit_time"]))
     return out
@@ -208,6 +242,7 @@ HTML = """
       <button class="primary" onclick="syncData()">同步 Binance 数据</button>
       <button onclick="runBacktest()">运行回测</button>
       <button onclick="runOptimize()">参数优化</button>
+      <button onclick="runWalkForward()">样本外验证</button>
     </section>
     <section class="grid">
       <div class="metric"><span>最终资金</span><strong id="finalEquity">-</strong></div>
@@ -227,6 +262,11 @@ HTML = """
         <h2>参数优化结果</h2>
         <table><thead><tr><th>排名</th><th>收益率</th><th>回撤</th><th>胜率</th><th>交易</th><th>参数</th></tr></thead><tbody id="optimizations"></tbody></table>
       </div>
+    </section>
+    <section class="panel">
+      <h2>Walk-forward 样本外验证</h2>
+      <div class="status" id="walkForwardRange">训练段选参，测试段只验证，不参与参数搜索</div>
+      <table><thead><tr><th>排名</th><th>训练收益</th><th>测试收益</th><th>测试回撤</th><th>测试胜率</th><th>测试交易</th><th>参数</th></tr></thead><tbody id="walkForward"></tbody></table>
     </section>
   </main>
 <script>
@@ -289,6 +329,15 @@ async function runOptimize() {
   setStatus(`优化完成，返回 ${data.count} 组结果`);
 }
 
+async function runWalkForward() {
+  setStatus('正在执行 walk-forward 样本外验证...');
+  const res = await fetch('/api/walk-forward?max_results=10&train_ratio=0.7', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload())});
+  const data = await res.json();
+  if (!res.ok) throwError(data);
+  fillWalkForward(data);
+  setStatus(`样本外验证完成：训练 ${data.train_count} 根，测试 ${data.test_count} 根`);
+}
+
 function fillMetrics(m) {
   document.getElementById('finalEquity').textContent = Number(m.final_equity).toFixed(2);
   document.getElementById('returnPct').textContent = `${Number(m.total_return_pct).toFixed(2)}%`;
@@ -318,6 +367,20 @@ function fillOptimizations(items) {
       <td>${Number(r.metrics.max_drawdown_pct).toFixed(2)}%</td>
       <td>${Number(r.metrics.win_rate_pct).toFixed(1)}%</td>
       <td>${r.metrics.trade_count}</td>
+      <td class="muted">EMA${r.params.ema_period}/MA${r.params.ma_period}, ADX${r.params.adx_min}, SL${r.params.stop_atr}, TP${r.params.take_atr}</td>
+    </tr>`).join('');
+}
+
+function fillWalkForward(data) {
+  document.getElementById('walkForwardRange').textContent = `训练段 ${data.train_start} 至 ${data.train_end}；测试段 ${data.test_start} 至 ${data.test_end}`;
+  document.getElementById('walkForward').innerHTML = (data.items || []).map((r, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td class="${r.train_metrics.total_return_pct >= 0 ? 'pos' : 'neg'}">${Number(r.train_metrics.total_return_pct).toFixed(2)}%</td>
+      <td class="${r.test_metrics.total_return_pct >= 0 ? 'pos' : 'neg'}">${Number(r.test_metrics.total_return_pct).toFixed(2)}%</td>
+      <td>${Number(r.test_metrics.max_drawdown_pct).toFixed(2)}%</td>
+      <td>${Number(r.test_metrics.win_rate_pct).toFixed(1)}%</td>
+      <td>${r.test_metrics.trade_count}</td>
       <td class="muted">EMA${r.params.ema_period}/MA${r.params.ma_period}, ADX${r.params.adx_min}, SL${r.params.stop_atr}, TP${r.params.take_atr}</td>
     </tr>`).join('');
 }
