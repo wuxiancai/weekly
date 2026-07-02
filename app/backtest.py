@@ -29,6 +29,7 @@ def run_backtest(
     candles: list[dict[str, Any]],
     params: StrategyParams,
     initial_equity: float = DEFAULTS.initial_equity,
+    leverage: float = DEFAULTS.leverage,
     fee_rate: float = DEFAULTS.fee_rate,
     slippage_rate: float = DEFAULTS.slippage_rate,
     start_trading_ms: int | None = None,
@@ -46,6 +47,7 @@ def run_backtest(
     trades: list[dict[str, Any]] = []
     equity_curve: list[dict[str, float]] = []
     position: Position | None = None
+    notional_multiplier = _notional_multiplier(leverage)
 
     for i, row in enumerate(enriched):
         previous = enriched[i - 1] if i > 0 else None
@@ -66,8 +68,9 @@ def run_backtest(
         can_trade = start_trading_ms is None or int(row["open_time"]) >= start_trading_ms
         if can_trade and position is None and action_signal in ("LONG", "SHORT") and signal_atr and previous is not None:
             entry_price = open_price * (1 + slippage_rate if action_signal == "LONG" else 1 - slippage_rate)
-            quantity = equity / entry_price
-            fee = equity * fee_rate
+            entry_notional = equity * notional_multiplier
+            quantity = entry_notional / entry_price
+            fee = entry_notional * fee_rate
             equity -= fee
             if action_signal == "LONG":
                 stop_price = entry_price - params.stop_atr * signal_atr
@@ -115,6 +118,7 @@ def run_backtest(
     metrics = {
         "initial_equity": round(initial_equity, 4),
         "final_equity": round(equity, 4),
+        "leverage": round(leverage, 4),
         "total_return_pct": round((equity / initial_equity - 1) * 100, 4) if initial_equity else 0.0,
         "max_drawdown_pct": round(max_drawdown * 100, 4),
         "trade_count": len(trades),
@@ -123,6 +127,10 @@ def run_backtest(
         "return_drawdown_ratio": round(((equity / initial_equity - 1) * 100) / (max_drawdown * 100), 4) if max_drawdown else 0.0,
     }
     return {"metrics": metrics, "trades": trades, "equity_curve": equity_curve, "candles": enriched}
+
+
+def _notional_multiplier(leverage: float) -> float:
+    return leverage if leverage > 0 else 1.0
 
 
 def _exit_decision(

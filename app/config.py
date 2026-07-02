@@ -15,7 +15,8 @@ class MarketDefaults:
     interval: str = "1w"
     start_date: str = "2019-09-02"
     end_date: str = "2026-06-29"
-    initial_equity: float = 1000.0
+    initial_equity: float = 10000.0
+    leverage: float = 0.0
     fee_rate: float = 0.0004
     slippage_rate: float = 0.0002
 

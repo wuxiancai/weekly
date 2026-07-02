@@ -4,6 +4,7 @@ from itertools import product
 from typing import Any
 
 from .backtest import run_backtest
+from .config import DEFAULTS
 from .strategy import StrategyParams
 
 
@@ -11,6 +12,10 @@ def optimize(
     candles: list[dict[str, Any]],
     max_results: int = 20,
     start_trading_ms: int | None = None,
+    initial_equity: float = DEFAULTS.initial_equity,
+    leverage: float = DEFAULTS.leverage,
+    fee_rate: float = DEFAULTS.fee_rate,
+    slippage_rate: float = DEFAULTS.slippage_rate,
 ) -> list[dict[str, Any]]:
     grid = {
         "ema_period": [15],
@@ -34,7 +39,15 @@ def optimize(
             continue
         for rsi_profile in rsi_profiles:
             params = StrategyParams(**candidate, **rsi_profile)
-            result = run_backtest(candles, params, start_trading_ms=start_trading_ms)
+            result = run_backtest(
+                candles,
+                params,
+                initial_equity=initial_equity,
+                leverage=leverage,
+                fee_rate=fee_rate,
+                slippage_rate=slippage_rate,
+                start_trading_ms=start_trading_ms,
+            )
             metrics = result["metrics"]
             if metrics["trade_count"] < 2:
                 continue

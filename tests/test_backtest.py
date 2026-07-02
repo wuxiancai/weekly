@@ -17,6 +17,10 @@ class BacktestTests(unittest.TestCase):
     def test_default_start_date_is_september_2019(self) -> None:
         self.assertEqual(DEFAULTS.start_date, "2019-09-02")
 
+    def test_default_capital_and_leverage(self) -> None:
+        self.assertEqual(DEFAULTS.initial_equity, 10000.0)
+        self.assertEqual(DEFAULTS.leverage, 0.0)
+
     def test_ma40_blocks_signals_until_40_weekly_candles_exist(self) -> None:
         rows_before = enrich_candles(_sample_candles(39), StrategyParams())
         self.assertTrue(all(row["ma"] is None for row in rows_before))
@@ -49,6 +53,43 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("total_return_pct", result["metrics"])
         self.assertIsInstance(result["trades"], list)
         self.assertTrue(result["equity_curve"])
+
+    def test_zero_leverage_matches_unleveraged_backtest(self) -> None:
+        candles = _sample_candles(140)
+        params = StrategyParams(
+            adx_min=0,
+            volume_mult=0.0,
+            long_rsi_min=0,
+            long_rsi_max=100,
+            short_rsi_min=0,
+            short_rsi_max=100,
+            stop_atr=10.0,
+            take_atr=10.0,
+        )
+
+        unleveraged = run_backtest(candles, params, initial_equity=10000.0)
+        zero_leverage = run_backtest(candles, params, initial_equity=10000.0, leverage=0.0)
+
+        self.assertEqual(zero_leverage["metrics"], unleveraged["metrics"])
+
+    def test_positive_leverage_changes_compounded_backtest_result(self) -> None:
+        candles = _sample_candles(140)
+        params = StrategyParams(
+            adx_min=0,
+            volume_mult=0.0,
+            long_rsi_min=0,
+            long_rsi_max=100,
+            short_rsi_min=0,
+            short_rsi_max=100,
+            stop_atr=10.0,
+            take_atr=10.0,
+        )
+
+        unleveraged = run_backtest(candles, params, initial_equity=10000.0, leverage=0.0)
+        leveraged = run_backtest(candles, params, initial_equity=10000.0, leverage=2.0)
+
+        self.assertNotEqual(leveraged["metrics"]["final_equity"], unleveraged["metrics"]["final_equity"])
+        self.assertGreater(leveraged["metrics"]["total_return_pct"], unleveraged["metrics"]["total_return_pct"])
 
     def test_entries_execute_after_signal_candle_to_avoid_lookahead(self) -> None:
         candles = _sample_candles(140)
