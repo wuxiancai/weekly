@@ -1,6 +1,7 @@
 import unittest
 
 from app.backtest import Position, _exit_decision, run_backtest
+from app.config import DEFAULTS
 from app.optimizer import walk_forward_optimize
 from app.strategy import StrategyParams, enrich_candles, signal_for
 
@@ -12,6 +13,18 @@ class BacktestTests(unittest.TestCase):
         self.assertIsNotNone(rows[-1]["ema"])
         self.assertIsNotNone(rows[-1]["ma"])
         self.assertIsNotNone(rows[-1]["atr"])
+
+    def test_default_start_date_is_september_2019(self) -> None:
+        self.assertEqual(DEFAULTS.start_date, "2019-09-02")
+
+    def test_ma40_blocks_signals_until_40_weekly_candles_exist(self) -> None:
+        rows_before = enrich_candles(_sample_candles(39), StrategyParams())
+        self.assertTrue(all(row["ma"] is None for row in rows_before))
+        self.assertTrue(all(row["signal"] == "HOLD" for row in rows_before))
+
+        rows_after = enrich_candles(_sample_candles(40), StrategyParams())
+        self.assertIsNone(rows_after[-2]["ma"])
+        self.assertIsNotNone(rows_after[-1]["ma"])
 
     def test_default_strategy_uses_optimized_weekly_params(self) -> None:
         params = StrategyParams()

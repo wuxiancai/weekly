@@ -13,7 +13,7 @@ DB_PATH = DATA_DIR / "trading.db"
 class MarketDefaults:
     symbol: str = "BTCUSDT"
     interval: str = "1w"
-    start_date: str = "2020-07-01"
+    start_date: str = "2019-09-02"
     end_date: str = "2026-06-29"
     initial_equity: float = 1000.0
     fee_rate: float = 0.0004

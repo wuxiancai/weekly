@@ -240,7 +240,7 @@ HTML = """
     <section class="toolbar">
       <label>交易对<input id="symbol" value="BTCUSDT"></label>
       <label>周期<input id="interval" value="1w"></label>
-      <label>开始日期<input id="start" value="2020-07-01"></label>
+      <label>开始日期<input id="start" value="2019-09-02"></label>
       <label>结束日期<input id="end" value="2026-06-29"></label>
       <label>EMA<input id="ema" type="number" value="15"></label>
       <label>MA<input id="ma" type="number" value="40"></label>
