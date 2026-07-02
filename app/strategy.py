@@ -21,7 +21,7 @@ class StrategyParams:
     stop_atr: float = 1.8
     take_atr: float = 7.5
     take_atr_step: float = 1.25
-    take_atr_max: float = 24.0
+    take_atr_max: float = 32.0
     take_atr_buffer_pct: float = 0.0
     volume_mult: float = 1.0
 

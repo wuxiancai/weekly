@@ -259,7 +259,7 @@ HTML = """
 <body>
   <header>
     <h1>BTCUSDT U本位永续合约模拟交易系统</h1>
-    <div class="status" id="status">USDT 保证金 / USDT 结算，默认本金 10000，默认不复利，EMA15 / MA40，周期 1w</div>
+    <div class="status" id="status">USDT 保证金 / USDT 结算，默认本金 10000，默认复利，2倍杠杆，EMA15 / MA40，周期 1w</div>
   </header>
   <main>
     <section class="toolbar">
@@ -268,10 +268,10 @@ HTML = """
       <label title="回测开始日期。推荐：2019-09-02；交易只从该日期后开始，指标可用之前历史预热。">开始日期<input id="start" value="2019-09-02"></label>
       <label title="回测结束日期。推荐：2026-06-29。">结束日期<input id="end" value="2026-06-29"></label>
       <label title="初始本金。复利=NO 时每笔按该固定本金开仓；复利=YES 时第一笔用该本金，之后按当前权益开仓。推荐：10000。">本金<input id="initialEquity" type="number" step="100" value="10000"></label>
-      <label title="是否复利。NO：每笔按固定本金开仓；YES：每笔按当前权益开仓。推荐：NO。">复利<select id="compound"><option value="false" selected>NO</option><option value="true">YES</option></select></label>
-      <label title="杠杆倍率。0 表示不使用杠杆；2 表示按 2 倍名义仓位计算盈亏和手续费。推荐：0。">杠杆<input id="leverage" type="number" step="0.1" value="0"></label>
-      <label title="单边手续费率。推荐：0.0004。">手续费<input id="feeRate" type="number" step="0.0001" value="0.0004"></label>
-      <label title="滑点率。推荐：0.0002，用于模拟成交价偏移。">滑点<input id="slippageRate" type="number" step="0.0001" value="0.0002"></label>
+      <label title="是否复利。NO：每笔按固定本金开仓；YES：每笔按当前权益开仓。推荐：YES。">复利<select id="compound"><option value="false">NO</option><option value="true" selected>YES</option></select></label>
+      <label title="杠杆倍率。0 表示不使用杠杆；2 表示按 2 倍名义仓位计算盈亏和手续费。推荐：2。">杠杆<input id="leverage" type="number" step="0.1" value="2"></label>
+      <label title="单边手续费率。推荐：0.0005。">手续费<input id="feeRate" type="number" step="0.0001" value="0.0005"></label>
+      <label title="滑点率。推荐：0.0005，用于模拟成交价偏移。">滑点<input id="slippageRate" type="number" step="0.0001" value="0.0005"></label>
       <label title="快速趋势均线 EMA 周期。推荐：15。">EMA<input id="ema" type="number" value="15"></label>
       <label title="慢速趋势均线 MA 周期。推荐：40；不足 40 根周 K 不会出信号。">MA<input id="ma" type="number" value="40"></label>
       <label title="RSI 周期。推荐：14。">RSI周期<input id="rsiPeriod" type="number" value="14"></label>
@@ -285,7 +285,7 @@ HTML = """
       <label title="ATR 止损倍数。推荐：1.8。">止损ATR<input id="stopAtr" type="number" step="0.1" value="1.8"></label>
       <label title="动态止盈启动 ATR 倍数。推荐：7.5。">止盈ATR<input id="takeAtr" type="number" step="0.1" value="7.5"></label>
       <label title="动态止盈保护位每次上移的 ATR 阶梯。推荐：1.25。">止盈阶梯<input id="takeAtrStep" type="number" step="0.05" value="1.25"></label>
-      <label title="动态止盈最高 ATR 倍数上限。推荐：24。">止盈上限<input id="takeAtrMax" type="number" step="0.5" value="24"></label>
+      <label title="动态止盈最高 ATR 倍数上限。推荐：32。">止盈上限<input id="takeAtrMax" type="number" step="0.5" value="32"></label>
       <label title="动态止盈保护位缓冲比例。推荐：0。">止盈缓冲<input id="takeAtrBuffer" type="number" step="0.01" value="0"></label>
       <label title="成交量过滤倍数，当前量需大于成交量均线乘以该值。推荐：1。">量能倍数<input id="volumeMult" type="number" step="0.05" value="1"></label>
       <button class="primary" onclick="syncData()">同步 Binance 数据</button>

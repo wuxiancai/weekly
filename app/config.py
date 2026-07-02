@@ -16,10 +16,10 @@ class MarketDefaults:
     start_date: str = "2019-09-02"
     end_date: str = "2026-06-29"
     initial_equity: float = 10000.0
-    leverage: float = 0.0
-    compound: bool = False
-    fee_rate: float = 0.0004
-    slippage_rate: float = 0.0002
+    leverage: float = 2.0
+    compound: bool = True
+    fee_rate: float = 0.0005
+    slippage_rate: float = 0.0005
 
 
 DEFAULTS = MarketDefaults()

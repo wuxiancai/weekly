@@ -20,8 +20,10 @@ class BacktestTests(unittest.TestCase):
 
     def test_default_capital_and_leverage(self) -> None:
         self.assertEqual(DEFAULTS.initial_equity, 10000.0)
-        self.assertEqual(DEFAULTS.leverage, 0.0)
-        self.assertFalse(DEFAULTS.compound)
+        self.assertEqual(DEFAULTS.leverage, 2.0)
+        self.assertTrue(DEFAULTS.compound)
+        self.assertEqual(DEFAULTS.fee_rate, 0.0005)
+        self.assertEqual(DEFAULTS.slippage_rate, 0.0005)
 
     def test_page_names_usdt_margined_futures_pnl_units(self) -> None:
         self.assertIn("BTCUSDT U本位永续合约", HTML)
@@ -30,11 +32,11 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("合约数量(BTC)", HTML)
         self.assertIn("多单收益 = (出场价 - 入场价) * 合约数量", HTML)
 
-    def test_page_exposes_compound_toggle_defaulting_to_no(self) -> None:
+    def test_page_exposes_compound_toggle_defaulting_to_yes(self) -> None:
         self.assertIn("复利", HTML)
         self.assertIn('<select id="compound">', HTML)
-        self.assertIn('<option value="false" selected>NO</option>', HTML)
-        self.assertIn('<option value="true">YES</option>', HTML)
+        self.assertIn('<option value="false">NO</option>', HTML)
+        self.assertIn('<option value="true" selected>YES</option>', HTML)
 
     def test_page_places_optimization_below_trades_and_shows_trade_metrics(self) -> None:
         self.assertLess(HTML.index("逐笔交易"), HTML.index("参数优化结果"))
@@ -65,7 +67,7 @@ class BacktestTests(unittest.TestCase):
         self.assertEqual(params.stop_atr, 1.8)
         self.assertEqual(params.take_atr, 7.5)
         self.assertEqual(params.take_atr_step, 1.25)
-        self.assertEqual(params.take_atr_max, 24.0)
+        self.assertEqual(params.take_atr_max, 32.0)
         self.assertEqual(params.take_atr_buffer_pct, 0.0)
         self.assertEqual(params.volume_mult, 1.0)
 
@@ -112,10 +114,15 @@ class BacktestTests(unittest.TestCase):
             take_atr=10.0,
         )
 
-        unleveraged = run_backtest(candles, params, initial_equity=10000.0)
-        zero_leverage = run_backtest(candles, params, initial_equity=10000.0, leverage=0.0)
+        unleveraged = run_backtest(candles, params, initial_equity=10000.0, leverage=1.0, compound=False)
+        zero_leverage = run_backtest(candles, params, initial_equity=10000.0, leverage=0.0, compound=False)
 
-        self.assertEqual(zero_leverage["metrics"], unleveraged["metrics"])
+        zero_metrics = dict(zero_leverage["metrics"])
+        one_metrics = dict(unleveraged["metrics"])
+        zero_metrics.pop("leverage")
+        one_metrics.pop("leverage")
+        self.assertEqual(zero_metrics, one_metrics)
+        self.assertEqual(zero_leverage["trades"], unleveraged["trades"])
 
     def test_compound_mode_increases_position_size_after_a_winning_trade(self) -> None:
         candles = _sample_candles(140)
@@ -130,8 +137,8 @@ class BacktestTests(unittest.TestCase):
             take_atr=10.0,
         )
 
-        fixed = run_backtest(candles, params, initial_equity=10000.0, compound=False)
-        compounded = run_backtest(candles, params, initial_equity=10000.0, compound=True)
+        fixed = run_backtest(candles, params, initial_equity=10000.0, leverage=0.0, compound=False)
+        compounded = run_backtest(candles, params, initial_equity=10000.0, leverage=0.0, compound=True)
 
         self.assertGreater(len(compounded["trades"]), 1)
         self.assertGreater(
