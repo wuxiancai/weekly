@@ -248,17 +248,19 @@ HTML = """
     .neg { color:var(--red); }
     .muted { color:var(--muted); }
     .status { color:var(--muted); font-size:13px; }
+    .formula { color:var(--muted); font-size:12px; line-height:1.6; margin:4px 0 12px; }
+    .formula a { color:var(--blue); text-decoration:none; }
     @media (max-width: 980px) { .toolbar { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: repeat(2, 1fr); } .split { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <header>
-    <h1>BTCUSDT 模拟自动交易系统</h1>
-    <div class="status" id="status">默认本金 10000，EMA15 / MA40，周期 1w</div>
+    <h1>BTCUSDT U本位永续合约模拟交易系统</h1>
+    <div class="status" id="status">USDT 保证金 / USDT 结算，默认本金 10000，EMA15 / MA40，周期 1w</div>
   </header>
   <main>
     <section class="toolbar">
-      <label title="交易标的。推荐：BTCUSDT。">交易对<input id="symbol" value="BTCUSDT"></label>
+      <label title="交易标的。推荐：BTCUSDT。此处固定按 Binance USDⓈ-M / U本位永续合约理解，不是币本位合约。">交易对<input id="symbol" value="BTCUSDT"></label>
       <label title="K 线周期。推荐：1w，当前策略按周线收盘确认。">周期<input id="interval" value="1w"></label>
       <label title="回测开始日期。推荐：2019-09-02；交易只从该日期后开始，指标可用之前历史预热。">开始日期<input id="start" value="2019-09-02"></label>
       <label title="回测结束日期。推荐：2026-06-29。">结束日期<input id="end" value="2026-06-29"></label>
@@ -288,7 +290,7 @@ HTML = """
       <button onclick="runWalkForward()">样本外验证</button>
     </section>
     <section class="grid">
-      <div class="metric"><span>最终资金</span><strong id="finalEquity">-</strong></div>
+      <div class="metric"><span>最终资金(USDT)</span><strong id="finalEquity">-</strong></div>
       <div class="metric"><span>总收益率</span><strong id="returnPct">-</strong></div>
       <div class="metric"><span>最大回撤</span><strong id="drawdown">-</strong></div>
       <div class="metric"><span>胜率</span><strong id="winRate">-</strong></div>
@@ -299,7 +301,12 @@ HTML = """
     <section class="split">
       <div class="panel">
         <h2>逐笔交易</h2>
-        <table><thead><tr><th>方向</th><th>入场</th><th>出场</th><th>入场价</th><th>出场价</th><th>收益</th><th>原因</th></tr></thead><tbody id="trades"></tbody></table>
+        <p class="formula">
+          BTCUSDT U本位永续合约按 USDT 保证金 / USDT 结算；合约数量单位是 BTC，盈亏单位是 USDT。
+          多单收益 = (出场价 - 入场价) * 合约数量；空单收益 = (入场价 - 出场价) * 合约数量，手续费另扣。
+          <a href="https://www.binance.com/en/support/faq/detail/3a55a23768cb416fb404f06ffedde4b2" target="_blank" rel="noreferrer">Binance PnL 说明</a>
+        </p>
+        <table><thead><tr><th>方向</th><th>入场</th><th>出场</th><th>入场价(USDT)</th><th>出场价(USDT)</th><th>合约数量(BTC)</th><th>收益(USDT)</th><th>原因</th></tr></thead><tbody id="trades"></tbody></table>
       </div>
       <div class="panel">
         <h2>参数优化结果</h2>
@@ -418,6 +425,7 @@ function fillTrades(items) {
       <td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td>
       <td>${t.entry_date}</td><td>${t.exit_date}</td>
       <td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td>
+      <td>${Number(t.quantity).toFixed(6)}</td>
       <td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td>
       <td>${t.exit_reason}</td>
     </tr>`).join('');

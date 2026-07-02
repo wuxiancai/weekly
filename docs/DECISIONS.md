@@ -95,3 +95,23 @@
 - 用户查看逐笔交易时希望下一笔交易本金包含上一笔收益或亏损。
 - `0` 作为默认杠杆可以清楚表达“不使用杠杆”，避免把 `1` 误解为额外杠杆。
 - 手续费按名义仓位计算，避免杠杆回测低估交易成本。
+
+## 0011 BTCUSDT 按 USD-M / U本位永续合约展示和计算
+
+BTCUSDT 必须按 Binance USDⓈ-M Futures / U本位永续合约理解：USDT 作为保证金和盈亏结算资产，合约数量单位是 BTC。页面必须明确显示 `BTCUSDT U本位永续合约`、`USDT 保证金 / USDT 结算`、`合约数量(BTC)` 和 `收益(USDT)`。
+
+盈亏公式按 Binance 官方 USDⓈ-M Futures PnL 说明：
+
+- 多单收益 = `(出场价 - 入场价) * 合约数量`
+- 空单收益 = `(入场价 - 出场价) * 合约数量`
+- 手续费另行扣除，当前回测按名义仓位计算开仓和平仓手续费。
+
+原因：
+
+- USDⓈ-M BTCUSDT 是线性合约，不是 COIN-M 币本位反向合约。
+- 只写“收益”容易被误解为 BTC 数量收益或现货买币收益。
+- 用户需要从页面上直接看出资金、盈亏和复利本金都以 USDT 计价。
+
+参考：
+
+- Binance 官方 FAQ：How to Calculate Profit and Loss for Futures Contracts，USDⓈ-M Futures contracts (BTCUSDT)。

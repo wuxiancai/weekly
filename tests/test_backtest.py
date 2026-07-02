@@ -2,6 +2,7 @@ import unittest
 
 from app.backtest import Position, _exit_decision, run_backtest
 from app.config import DEFAULTS
+from app.main import HTML
 from app.optimizer import walk_forward_optimize
 from app.strategy import StrategyParams, enrich_candles, signal_for
 
@@ -20,6 +21,13 @@ class BacktestTests(unittest.TestCase):
     def test_default_capital_and_leverage(self) -> None:
         self.assertEqual(DEFAULTS.initial_equity, 10000.0)
         self.assertEqual(DEFAULTS.leverage, 0.0)
+
+    def test_page_names_usdt_margined_futures_pnl_units(self) -> None:
+        self.assertIn("BTCUSDT U本位永续合约", HTML)
+        self.assertIn("USDT 保证金 / USDT 结算", HTML)
+        self.assertIn("收益(USDT)", HTML)
+        self.assertIn("合约数量(BTC)", HTML)
+        self.assertIn("多单收益 = (出场价 - 入场价) * 合约数量", HTML)
 
     def test_ma40_blocks_signals_until_40_weekly_candles_exist(self) -> None:
         rows_before = enrich_candles(_sample_candles(39), StrategyParams())
