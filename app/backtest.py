@@ -30,8 +30,8 @@ def run_backtest(
     """Run a no-lookahead backtest.
 
     A signal is generated from a fully closed candle and can only be executed on
-    the next candle open. The current candle high/low may only affect positions
-    that already existed at that candle open.
+    the next candle open. Stop-loss and take-profit exits are confirmed by the
+    current candle close, so intrabar wicks do not trigger exits.
     """
     enriched = enrich_candles(candles, params)
     equity = initial_equity
@@ -51,7 +51,7 @@ def run_backtest(
         signal_atr = previous.get("atr") if previous is not None else None
 
         if position is not None:
-            exit_price, exit_reason = _exit_decision(position, high, low, open_price, action_signal)
+            exit_price, exit_reason = _exit_decision(position, high, low, close, action_signal, signal_price=open_price)
             if exit_price is not None:
                 equity, trade = _close_position(position, row["open_time"], exit_price, equity, fee_rate, slippage_rate, exit_reason)
                 trades.append(trade)
@@ -70,7 +70,7 @@ def run_backtest(
                 stop_price = entry_price + params.stop_atr * signal_atr
                 take_price = entry_price - params.take_atr * signal_atr
             position = Position(action_signal, int(previous["open_time"]), int(row["open_time"]), entry_price, quantity, stop_price, take_price, equity)
-            same_bar_exit, same_bar_reason = _exit_decision(position, high, low, open_price, "HOLD")
+            same_bar_exit, same_bar_reason = _exit_decision(position, high, low, close, "HOLD")
             if same_bar_exit is not None:
                 equity, trade = _close_position(position, row["open_time"], same_bar_exit, equity, fee_rate, slippage_rate, same_bar_reason)
                 trades.append(trade)
@@ -105,21 +105,28 @@ def run_backtest(
     return {"metrics": metrics, "trades": trades, "equity_curve": equity_curve, "candles": enriched}
 
 
-def _exit_decision(position: Position, high: float, low: float, close: float, signal: str) -> tuple[float | None, str]:
+def _exit_decision(
+    position: Position,
+    high: float,
+    low: float,
+    close: float,
+    signal: str,
+    signal_price: float | None = None,
+) -> tuple[float | None, str]:
     if position.side == "LONG":
-        if low <= position.stop_price:
+        if close <= position.stop_price:
             return position.stop_price, "STOP_LOSS"
-        if high >= position.take_price:
+        if close >= position.take_price:
             return position.take_price, "TAKE_PROFIT"
         if signal == "SHORT":
-            return close, "REVERSE_SIGNAL"
+            return signal_price if signal_price is not None else close, "REVERSE_SIGNAL"
     else:
-        if high >= position.stop_price:
+        if close >= position.stop_price:
             return position.stop_price, "STOP_LOSS"
-        if low <= position.take_price:
+        if close <= position.take_price:
             return position.take_price, "TAKE_PROFIT"
         if signal == "LONG":
-            return close, "REVERSE_SIGNAL"
+            return signal_price if signal_price is not None else close, "REVERSE_SIGNAL"
     return None, ""
 
 

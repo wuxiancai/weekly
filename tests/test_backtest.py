@@ -1,6 +1,6 @@
 import unittest
 
-from app.backtest import run_backtest
+from app.backtest import Position, _exit_decision, run_backtest
 from app.optimizer import walk_forward_optimize
 from app.strategy import StrategyParams, enrich_candles
 
@@ -38,6 +38,29 @@ class BacktestTests(unittest.TestCase):
         self.assertTrue(result["trades"])
         for trade in result["trades"]:
             self.assertGreater(trade["entry_time"], trade["signal_time"])
+
+    def test_stop_loss_requires_close_confirmation_not_intrabar_wick(self) -> None:
+        position = Position(
+            side="LONG",
+            signal_time=1,
+            entry_time=2,
+            entry_price=64925.68,
+            quantity=1.0,
+            stop_price=50177.89,
+            take_price=90734.32,
+            entry_equity=1000.0,
+        )
+
+        exit_price, exit_reason = _exit_decision(
+            position,
+            high=62737.20,
+            low=48888.00,
+            close=58693.10,
+            signal="HOLD",
+        )
+
+        self.assertIsNone(exit_price)
+        self.assertEqual(exit_reason, "")
 
     def test_walk_forward_reports_train_and_test_metrics(self) -> None:
         candles = _sample_candles(140)
