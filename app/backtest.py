@@ -30,6 +30,7 @@ def run_backtest(
     params: StrategyParams,
     initial_equity: float = DEFAULTS.initial_equity,
     leverage: float = DEFAULTS.leverage,
+    compound: bool = DEFAULTS.compound,
     fee_rate: float = DEFAULTS.fee_rate,
     slippage_rate: float = DEFAULTS.slippage_rate,
     start_trading_ms: int | None = None,
@@ -68,7 +69,8 @@ def run_backtest(
         can_trade = start_trading_ms is None or int(row["open_time"]) >= start_trading_ms
         if can_trade and position is None and action_signal in ("LONG", "SHORT") and signal_atr and previous is not None:
             entry_price = open_price * (1 + slippage_rate if action_signal == "LONG" else 1 - slippage_rate)
-            entry_notional = equity * notional_multiplier
+            entry_base = equity if compound else min(equity, initial_equity)
+            entry_notional = entry_base * notional_multiplier
             quantity = entry_notional / entry_price
             fee = entry_notional * fee_rate
             equity -= fee
@@ -119,6 +121,7 @@ def run_backtest(
         "initial_equity": round(initial_equity, 4),
         "final_equity": round(equity, 4),
         "leverage": round(leverage, 4),
+        "compound": compound,
         "total_return_pct": round((equity / initial_equity - 1) * 100, 4) if initial_equity else 0.0,
         "max_drawdown_pct": round(max_drawdown * 100, 4),
         "trade_count": len(trades),

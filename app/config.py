@@ -17,6 +17,7 @@ class MarketDefaults:
     end_date: str = "2026-06-29"
     initial_equity: float = 10000.0
     leverage: float = 0.0
+    compound: bool = False
     fee_rate: float = 0.0004
     slippage_rate: float = 0.0002
 

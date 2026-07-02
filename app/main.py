@@ -34,6 +34,7 @@ class BacktestRequest(BaseModel):
     end_date: str = DEFAULTS.end_date
     initial_equity: float = DEFAULTS.initial_equity
     leverage: float = DEFAULTS.leverage
+    compound: bool = DEFAULTS.compound
     fee_rate: float = DEFAULTS.fee_rate
     slippage_rate: float = DEFAULTS.slippage_rate
     params: dict[str, Any] = {}
@@ -90,6 +91,7 @@ def backtest(request: BacktestRequest) -> dict[str, Any]:
         params,
         initial_equity=request.initial_equity,
         leverage=request.leverage,
+        compound=request.compound,
         fee_rate=request.fee_rate,
         slippage_rate=request.slippage_rate,
         start_trading_ms=start_ms,
@@ -125,6 +127,7 @@ def optimize_api(request: BacktestRequest, max_results: int = Query(20, ge=1, le
         start_trading_ms=start_ms,
         initial_equity=request.initial_equity,
         leverage=request.leverage,
+        compound=request.compound,
         fee_rate=request.fee_rate,
         slippage_rate=request.slippage_rate,
     )
@@ -228,6 +231,7 @@ HTML = """
     .toolbar { display:grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap:10px; padding:12px; align-items:end; }
     label { display:grid; gap:5px; color:var(--muted); font-size:12px; }
     input { width:100%; border:1px solid var(--line); background:#0d1015; color:var(--text); border-radius:6px; padding:9px; font-size:13px; }
+    select { width:100%; border:1px solid var(--line); background:#0d1015; color:var(--text); border-radius:6px; padding:9px; font-size:13px; }
     button { border:1px solid #3b4654; background:#202733; color:var(--text); border-radius:6px; padding:10px 12px; cursor:pointer; font-weight:650; min-height:38px; width:100%; }
     button.primary { background:#1b6b50; border-color:#27936f; }
     button:hover { filter:brightness(1.12); }
@@ -256,7 +260,7 @@ HTML = """
 <body>
   <header>
     <h1>BTCUSDT U本位永续合约模拟交易系统</h1>
-    <div class="status" id="status">USDT 保证金 / USDT 结算，默认本金 10000，EMA15 / MA40，周期 1w</div>
+    <div class="status" id="status">USDT 保证金 / USDT 结算，默认本金 10000，默认不复利，EMA15 / MA40，周期 1w</div>
   </header>
   <main>
     <section class="toolbar">
@@ -264,7 +268,8 @@ HTML = """
       <label title="K 线周期。推荐：1w，当前策略按周线收盘确认。">周期<input id="interval" value="1w"></label>
       <label title="回测开始日期。推荐：2019-09-02；交易只从该日期后开始，指标可用之前历史预热。">开始日期<input id="start" value="2019-09-02"></label>
       <label title="回测结束日期。推荐：2026-06-29。">结束日期<input id="end" value="2026-06-29"></label>
-      <label title="初始本金，回测使用复利，下一笔交易使用上一笔结束后的权益。推荐：10000。">本金<input id="initialEquity" type="number" step="100" value="10000"></label>
+      <label title="初始本金。复利=NO 时每笔按该固定本金开仓；复利=YES 时第一笔用该本金，之后按当前权益开仓。推荐：10000。">本金<input id="initialEquity" type="number" step="100" value="10000"></label>
+      <label title="是否复利。NO：每笔按固定本金开仓；YES：每笔按当前权益开仓。推荐：NO。">复利<select id="compound"><option value="false" selected>NO</option><option value="true">YES</option></select></label>
       <label title="杠杆倍率。0 表示不使用杠杆；2 表示按 2 倍名义仓位计算盈亏和手续费。推荐：0。">杠杆<input id="leverage" type="number" step="0.1" value="0"></label>
       <label title="单边手续费率。推荐：0.0004。">手续费<input id="feeRate" type="number" step="0.0001" value="0.0004"></label>
       <label title="滑点率。推荐：0.0002，用于模拟成交价偏移。">滑点<input id="slippageRate" type="number" step="0.0001" value="0.0002"></label>
@@ -330,6 +335,7 @@ function payload() {
     start_date: document.getElementById('start').value,
     end_date: document.getElementById('end').value,
     initial_equity: num('initialEquity'),
+    compound: document.getElementById('compound').value === 'true',
     leverage: num('leverage'),
     fee_rate: num('feeRate'),
     slippage_rate: num('slippageRate'),

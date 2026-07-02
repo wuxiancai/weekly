@@ -14,6 +14,7 @@ def optimize(
     start_trading_ms: int | None = None,
     initial_equity: float = DEFAULTS.initial_equity,
     leverage: float = DEFAULTS.leverage,
+    compound: bool = DEFAULTS.compound,
     fee_rate: float = DEFAULTS.fee_rate,
     slippage_rate: float = DEFAULTS.slippage_rate,
 ) -> list[dict[str, Any]]:
@@ -44,6 +45,7 @@ def optimize(
                 params,
                 initial_equity=initial_equity,
                 leverage=leverage,
+                compound=compound,
                 fee_rate=fee_rate,
                 slippage_rate=slippage_rate,
                 start_trading_ms=start_trading_ms,
