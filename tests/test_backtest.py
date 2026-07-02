@@ -36,6 +36,13 @@ class BacktestTests(unittest.TestCase):
         self.assertIn('<option value="false" selected>NO</option>', HTML)
         self.assertIn('<option value="true">YES</option>', HTML)
 
+    def test_page_places_optimization_below_trades_and_shows_trade_metrics(self) -> None:
+        self.assertLess(HTML.index("逐笔交易"), HTML.index("参数优化结果"))
+        self.assertIn("收益率", HTML)
+        self.assertIn("盈亏比", HTML)
+        self.assertIn("最大回撤", HTML)
+        self.assertIn("收益回撤比", HTML)
+
     def test_ma40_blocks_signals_until_40_weekly_candles_exist(self) -> None:
         rows_before = enrich_candles(_sample_candles(39), StrategyParams())
         self.assertTrue(all(row["ma"] is None for row in rows_before))
@@ -68,6 +75,29 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("total_return_pct", result["metrics"])
         self.assertIsInstance(result["trades"], list)
         self.assertTrue(result["equity_curve"])
+
+    def test_trade_records_include_return_risk_and_drawdown_metrics(self) -> None:
+        candles = _sample_candles(140)
+        result = run_backtest(
+            candles,
+            StrategyParams(
+                adx_min=0,
+                volume_mult=0.0,
+                long_rsi_min=0,
+                long_rsi_max=100,
+                short_rsi_min=0,
+                short_rsi_max=100,
+                stop_atr=10.0,
+                take_atr=10.0,
+            ),
+        )
+
+        trade = result["trades"][0]
+
+        self.assertIn("pnl_pct", trade)
+        self.assertIn("reward_risk_ratio", trade)
+        self.assertIn("max_drawdown_pct", trade)
+        self.assertIn("return_drawdown_ratio", trade)
 
     def test_zero_leverage_matches_unleveraged_backtest(self) -> None:
         candles = _sample_candles(140)

@@ -243,7 +243,6 @@ HTML = """
     .panel { padding:12px; }
     .chart-wrap { height:520px; }
     canvas { width:100%; height:100%; display:block; background:#11151b; border-radius:6px; }
-    .split { display:grid; grid-template-columns: 1.1fr .9fr; gap:14px; }
     table { width:100%; border-collapse:collapse; font-size:12px; }
     th, td { border-bottom:1px solid var(--line); padding:8px; text-align:right; white-space:nowrap; }
     th:first-child, td:first-child { text-align:left; }
@@ -254,7 +253,7 @@ HTML = """
     .status { color:var(--muted); font-size:13px; }
     .formula { color:var(--muted); font-size:12px; line-height:1.6; margin:4px 0 12px; }
     .formula a { color:var(--blue); text-decoration:none; }
-    @media (max-width: 980px) { .toolbar { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: repeat(2, 1fr); } .split { grid-template-columns: 1fr; } }
+    @media (max-width: 980px) { .toolbar { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: repeat(2, 1fr); } }
   </style>
 </head>
 <body>
@@ -303,20 +302,18 @@ HTML = """
       <div class="metric"><span>收益回撤比</span><strong id="rdd">-</strong></div>
     </section>
     <section class="panel chart-wrap"><canvas id="chart"></canvas></section>
-    <section class="split">
-      <div class="panel">
-        <h2>逐笔交易</h2>
-        <p class="formula">
-          BTCUSDT U本位永续合约按 USDT 保证金 / USDT 结算；合约数量单位是 BTC，盈亏单位是 USDT。
-          多单收益 = (出场价 - 入场价) * 合约数量；空单收益 = (入场价 - 出场价) * 合约数量，手续费另扣。
-          <a href="https://www.binance.com/en/support/faq/detail/3a55a23768cb416fb404f06ffedde4b2" target="_blank" rel="noreferrer">Binance PnL 说明</a>
-        </p>
-        <table><thead><tr><th>方向</th><th>入场</th><th>出场</th><th>入场价(USDT)</th><th>出场价(USDT)</th><th>合约数量(BTC)</th><th>收益(USDT)</th><th>原因</th></tr></thead><tbody id="trades"></tbody></table>
-      </div>
-      <div class="panel">
-        <h2>参数优化结果</h2>
-        <table><thead><tr><th>排名</th><th>收益率</th><th>回撤</th><th>胜率</th><th>交易</th><th>参数</th></tr></thead><tbody id="optimizations"></tbody></table>
-      </div>
+    <section class="panel">
+      <h2>逐笔交易</h2>
+      <p class="formula">
+        BTCUSDT U本位永续合约按 USDT 保证金 / USDT 结算；合约数量单位是 BTC，盈亏单位是 USDT。
+        多单收益 = (出场价 - 入场价) * 合约数量；空单收益 = (入场价 - 出场价) * 合约数量，手续费另扣。
+        <a href="https://www.binance.com/en/support/faq/detail/3a55a23768cb416fb404f06ffedde4b2" target="_blank" rel="noreferrer">Binance PnL 说明</a>
+      </p>
+      <table><thead><tr><th>方向</th><th>入场</th><th>出场</th><th>入场价(USDT)</th><th>出场价(USDT)</th><th>合约数量(BTC)</th><th>收益(USDT)</th><th>收益率</th><th>盈亏比</th><th>最大回撤</th><th>收益回撤比</th><th>原因</th></tr></thead><tbody id="trades"></tbody></table>
+    </section>
+    <section class="panel">
+      <h2>参数优化结果</h2>
+      <table><thead><tr><th>排名</th><th>收益率</th><th>回撤</th><th>胜率</th><th>交易</th><th>参数</th></tr></thead><tbody id="optimizations"></tbody></table>
     </section>
     <section class="panel">
       <h2>Walk-forward 样本外验证</h2>
@@ -433,6 +430,10 @@ function fillTrades(items) {
       <td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td>
       <td>${Number(t.quantity).toFixed(6)}</td>
       <td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td>
+      <td class="${t.pnl_pct >= 0 ? 'pos' : 'neg'}">${Number(t.pnl_pct).toFixed(2)}%</td>
+      <td>${Number(t.reward_risk_ratio).toFixed(2)}</td>
+      <td>${Number(t.max_drawdown_pct).toFixed(2)}%</td>
+      <td>${Number(t.return_drawdown_ratio).toFixed(2)}</td>
       <td>${t.exit_reason}</td>
     </tr>`).join('');
 }

@@ -23,6 +23,9 @@ class Position:
     take_atr_max: float = 0.0
     take_atr_buffer_pct: float = 0.0
     take_profit_armed: bool = False
+    entry_margin: float = 0.0
+    risk_amount: float = 0.0
+    max_adverse_pct: float = 0.0
 
 
 def run_backtest(
@@ -60,6 +63,7 @@ def run_backtest(
         signal_atr = previous.get("atr") if previous is not None else None
 
         if position is not None:
+            _update_position_adverse(position, close)
             exit_price, exit_reason = _exit_decision(position, high, low, close, action_signal, signal_price=open_price)
             if exit_price is not None:
                 equity, trade = _close_position(position, row["open_time"], exit_price, equity, fee_rate, slippage_rate, exit_reason)
@@ -81,20 +85,23 @@ def run_backtest(
                 stop_price = entry_price + params.stop_atr * signal_atr
                 take_price = entry_price - params.take_atr * signal_atr
             position = Position(
-                action_signal,
-                int(previous["open_time"]),
-                int(row["open_time"]),
-                entry_price,
-                quantity,
-                stop_price,
-                take_price,
-                equity,
-                float(signal_atr),
-                params.take_atr,
-                params.take_atr_step,
-                params.take_atr_max,
-                params.take_atr_buffer_pct,
+                side=action_signal,
+                signal_time=int(previous["open_time"]),
+                entry_time=int(row["open_time"]),
+                entry_price=entry_price,
+                quantity=quantity,
+                stop_price=stop_price,
+                take_price=take_price,
+                entry_equity=equity,
+                atr=float(signal_atr),
+                take_atr_start=params.take_atr,
+                take_atr_step=params.take_atr_step,
+                take_atr_max=params.take_atr_max,
+                take_atr_buffer_pct=params.take_atr_buffer_pct,
+                entry_margin=entry_base,
+                risk_amount=abs(entry_price - stop_price) * quantity,
             )
+            _update_position_adverse(position, close)
             same_bar_exit, same_bar_reason = _exit_decision(position, high, low, close, "HOLD")
             if same_bar_exit is not None:
                 equity, trade = _close_position(position, row["open_time"], same_bar_exit, equity, fee_rate, slippage_rate, same_bar_reason)
@@ -249,7 +256,12 @@ def _close_position(
         pnl = (position.entry_price - adjusted_exit) * position.quantity
     exit_notional = adjusted_exit * position.quantity
     fee = exit_notional * fee_rate
-    final_equity = equity + pnl - fee
+    net_pnl = pnl - fee
+    final_equity = equity + net_pnl
+    entry_margin = position.entry_margin or position.entry_equity
+    pnl_pct = net_pnl / entry_margin * 100 if entry_margin else 0.0
+    reward_risk_ratio = net_pnl / position.risk_amount if position.risk_amount else 0.0
+    return_drawdown_ratio = pnl_pct / position.max_adverse_pct if position.max_adverse_pct else 0.0
     trade = {
         "side": position.side,
         "signal_time": position.signal_time,
@@ -258,11 +270,25 @@ def _close_position(
         "entry_price": round(position.entry_price, 4),
         "exit_price": round(adjusted_exit, 4),
         "quantity": round(position.quantity, 8),
-        "pnl": round(pnl - fee, 4),
-        "pnl_pct": round((final_equity / position.entry_equity - 1) * 100, 4) if position.entry_equity else 0.0,
+        "pnl": round(net_pnl, 4),
+        "pnl_pct": round(pnl_pct, 4),
+        "reward_risk_ratio": round(reward_risk_ratio, 4),
+        "max_drawdown_pct": round(position.max_adverse_pct, 4),
+        "return_drawdown_ratio": round(return_drawdown_ratio, 4),
         "exit_reason": exit_reason,
     }
     return final_equity, trade
+
+
+def _update_position_adverse(position: Position, close: float) -> None:
+    if not position.entry_margin:
+        return
+    if position.side == "LONG":
+        adverse = max(0.0, (position.entry_price - close) * position.quantity)
+    else:
+        adverse = max(0.0, (close - position.entry_price) * position.quantity)
+    adverse_pct = adverse / position.entry_margin * 100
+    position.max_adverse_pct = max(position.max_adverse_pct, adverse_pct)
 
 
 def _mark_to_market(equity: float, position: Position, close: float) -> float:
