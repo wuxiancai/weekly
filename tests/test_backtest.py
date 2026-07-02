@@ -50,9 +50,24 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("ETHUSDT U本位永续合约日线回测系统", ETH_HTML)
         self.assertIn('href="/">BTC 回测</a>', ETH_HTML)
         self.assertIn('value="ETHUSDT"', ETH_HTML)
-        self.assertIn('value="1d"', ETH_HTML)
+        self.assertIn('const PAGE_SYMBOL = \'ETHUSDT\';', ETH_HTML)
+        self.assertIn('const PAGE_INTERVAL = \'1d\';', ETH_HTML)
+        self.assertIn('<option value="1d" selected>1d</option>', ETH_HTML)
         self.assertIn('id="takeAtr" type="number" step="0.1" value="6.5"', ETH_HTML)
         self.assertIn('id="takeAtrMax" type="number" step="0.5" value="24"', ETH_HTML)
+
+    def test_page_has_independent_defaults_for_symbol_and_interval(self) -> None:
+        self.assertIn('<select id="interval" onchange="applyIntervalDefaults()">', HTML)
+        self.assertIn('<option value="1w" selected>1w</option>', HTML)
+        self.assertIn('<option value="1d">1d</option>', HTML)
+        self.assertIn("const STRATEGY_DEFAULTS = {", HTML)
+        self.assertIn("BTCUSDT: {", HTML)
+        self.assertIn("ETHUSDT: {", HTML)
+        self.assertIn("takeAtr: 6.5", HTML)
+        self.assertIn("takeAtrMax: 24", HTML)
+        self.assertIn("takeAtrMax: 32", HTML)
+        self.assertIn("BTCUSDT: {", ETH_HTML)
+        self.assertIn("ETHUSDT: {", ETH_HTML)
 
     def test_ma40_blocks_signals_until_40_weekly_candles_exist(self) -> None:
         rows_before = enrich_candles(_sample_candles(39), StrategyParams())

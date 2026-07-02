@@ -275,7 +275,7 @@ HTML = """
   <main>
     <section class="toolbar">
       <label title="交易标的。推荐：BTCUSDT。此处固定按 Binance USDⓈ-M / U本位永续合约理解，不是币本位合约。">交易对<input id="symbol" value="BTCUSDT"></label>
-      <label title="K 线周期。推荐：1w，当前策略按周线收盘确认。">周期<input id="interval" value="1w"></label>
+      <label title="K 线周期。推荐：周线 1w；切换到 1d 时会自动套用当前交易对的日线默认参数。">周期<select id="interval" onchange="applyIntervalDefaults()"><option value="1w" selected>1w</option><option value="1d">1d</option></select></label>
       <label title="回测开始日期。推荐：2019-09-02；交易只从该日期后开始，指标可用之前历史预热。">开始日期<input id="start" value="2019-09-02"></label>
       <label title="回测结束日期。推荐：2026-06-29。">结束日期<input id="end" value="2026-06-29"></label>
       <label title="初始本金。复利=NO 时每笔按该固定本金开仓；复利=YES 时第一笔用该本金，之后按当前权益开仓。推荐：10000。">本金<input id="initialEquity" type="number" step="100" value="10000"></label>
@@ -335,6 +335,75 @@ HTML = """
 <script>
 let candles = [];
 let lastResult = null;
+const PAGE_SYMBOL = 'BTCUSDT';
+const PAGE_INTERVAL = '1w';
+const STRATEGY_DEFAULTS = {
+  BTCUSDT: {
+    '1w': {
+      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 2,
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 15, ma: 40, rsiPeriod: 14, atrPeriod: 14,
+      adxPeriod: 14, adx: 0, longRsiMin: 35, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 1.8, takeAtr: 7.5, takeAtrStep: 1.25, takeAtrMax: 32, takeAtrBuffer: 0, volumeMult: 1
+    },
+    '1d': {
+      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 2,
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 15, ma: 40, rsiPeriod: 14, atrPeriod: 14,
+      adxPeriod: 14, adx: 0, longRsiMin: 35, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 1.8, takeAtr: 7.5, takeAtrStep: 1.25, takeAtrMax: 32, takeAtrBuffer: 0, volumeMult: 1
+    }
+  },
+  ETHUSDT: {
+    '1w': {
+      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 2,
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 15, ma: 40, rsiPeriod: 14, atrPeriod: 14,
+      adxPeriod: 14, adx: 0, longRsiMin: 35, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 1.8, takeAtr: 7.5, takeAtrStep: 1.25, takeAtrMax: 32, takeAtrBuffer: 0, volumeMult: 1
+    },
+    '1d': {
+      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 2,
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 15, ma: 40, rsiPeriod: 14, atrPeriod: 14,
+      adxPeriod: 14, adx: 0, longRsiMin: 35, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 1.8, takeAtr: 6.5, takeAtrStep: 1.25, takeAtrMax: 24, takeAtrBuffer: 0, volumeMult: 1
+    }
+  }
+};
+
+function applyIntervalDefaults() {
+  const symbol = document.getElementById('symbol').value.toUpperCase();
+  const interval = document.getElementById('interval').value;
+  const defaults = (STRATEGY_DEFAULTS[symbol] || STRATEGY_DEFAULTS[PAGE_SYMBOL] || {})[interval];
+  if (!defaults) return;
+  setValue('symbol', symbol);
+  setValue('start', defaults.start);
+  setValue('end', defaults.end);
+  setValue('initialEquity', defaults.initialEquity);
+  document.getElementById('compound').value = String(defaults.compound);
+  setValue('leverage', defaults.leverage);
+  setValue('feeRate', defaults.feeRate);
+  setValue('slippageRate', defaults.slippageRate);
+  setValue('ema', defaults.ema);
+  setValue('ma', defaults.ma);
+  setValue('rsiPeriod', defaults.rsiPeriod);
+  setValue('atrPeriod', defaults.atrPeriod);
+  setValue('adxPeriod', defaults.adxPeriod);
+  setValue('adx', defaults.adx);
+  setValue('longRsiMin', defaults.longRsiMin);
+  setValue('longRsiMax', defaults.longRsiMax);
+  setValue('shortRsiMin', defaults.shortRsiMin);
+  setValue('shortRsiMax', defaults.shortRsiMax);
+  setValue('stopAtr', defaults.stopAtr);
+  setValue('takeAtr', defaults.takeAtr);
+  setValue('takeAtrStep', defaults.takeAtrStep);
+  setValue('takeAtrMax', defaults.takeAtrMax);
+  setValue('takeAtrBuffer', defaults.takeAtrBuffer);
+  setValue('volumeMult', defaults.volumeMult);
+  setStatus(`${symbol} ${interval} 默认参数已应用`);
+  loadCandles().catch(() => {});
+}
+
+function setValue(id, value) {
+  document.getElementById(id).value = value;
+}
 
 function payload() {
   return {
@@ -540,7 +609,11 @@ function drawLine(ctx, items, key, x, y, color) {
 function setStatus(text) { document.getElementById('status').textContent = text; }
 function throwError(data) { throw new Error(data.detail || JSON.stringify(data)); }
 window.addEventListener('resize', () => drawChart(candles, lastResult ? lastResult.trades : []));
-loadCandles().catch(() => {});
+document.addEventListener('DOMContentLoaded', () => {
+  setValue('symbol', PAGE_SYMBOL);
+  document.getElementById('interval').value = PAGE_INTERVAL;
+  applyIntervalDefaults();
+});
 </script>
 </body>
 </html>
@@ -548,11 +621,18 @@ loadCandles().catch(() => {});
 
 
 ETH_HTML = (
-    HTML.replace("BTCUSDT", "ETHUSDT")
-    .replace("ETHUSDT U本位永续合约模拟交易系统", "ETHUSDT U本位永续合约日线回测系统")
+    HTML.replace("<title>BTCUSDT 模拟自动交易系统</title>", "<title>ETHUSDT 日线回测系统</title>")
+    .replace("BTCUSDT U本位永续合约模拟交易系统", "ETHUSDT U本位永续合约日线回测系统")
     .replace('href="/eth">ETH 回测</a>', 'href="/">BTC 回测</a>')
+    .replace("推荐：BTCUSDT", "推荐：ETHUSDT")
+    .replace('id="symbol" value="BTCUSDT"', 'id="symbol" value="ETHUSDT"')
+    .replace("BTCUSDT U本位永续合约按", "ETHUSDT U本位永续合约按")
+    .replace("合约数量单位是 BTC", "合约数量单位是 ETH")
+    .replace("合约数量(BTC)", "合约数量(ETH)")
+    .replace("const PAGE_SYMBOL = 'BTCUSDT';", "const PAGE_SYMBOL = 'ETHUSDT';")
+    .replace("const PAGE_INTERVAL = '1w';", "const PAGE_INTERVAL = '1d';")
     .replace("周期 1w", "周期 1d")
-    .replace('value="1w"', 'value="1d"')
+    .replace('<option value="1w" selected>1w</option><option value="1d">1d</option>', '<option value="1w">1w</option><option value="1d" selected>1d</option>')
     .replace("动态止盈启动 ATR 倍数。推荐：7.5", "动态止盈启动 ATR 倍数。推荐：6.5")
     .replace('id="takeAtr" type="number" step="0.1" value="7.5"', 'id="takeAtr" type="number" step="0.1" value="6.5"')
     .replace("动态止盈最高 ATR 倍数上限。推荐：32", "动态止盈最高 ATR 倍数上限。推荐：24")
