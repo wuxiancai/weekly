@@ -17,6 +17,12 @@ class Position:
     stop_price: float
     take_price: float
     entry_equity: float
+    atr: float | None = None
+    take_atr_start: float = 0.0
+    take_atr_step: float = 0.0
+    take_atr_max: float = 0.0
+    take_atr_buffer_pct: float = 0.0
+    take_profit_armed: bool = False
 
 
 def run_backtest(
@@ -69,7 +75,21 @@ def run_backtest(
             else:
                 stop_price = entry_price + params.stop_atr * signal_atr
                 take_price = entry_price - params.take_atr * signal_atr
-            position = Position(action_signal, int(previous["open_time"]), int(row["open_time"]), entry_price, quantity, stop_price, take_price, equity)
+            position = Position(
+                action_signal,
+                int(previous["open_time"]),
+                int(row["open_time"]),
+                entry_price,
+                quantity,
+                stop_price,
+                take_price,
+                equity,
+                float(signal_atr),
+                params.take_atr,
+                params.take_atr_step,
+                params.take_atr_max,
+                params.take_atr_buffer_pct,
+            )
             same_bar_exit, same_bar_reason = _exit_decision(position, high, low, close, "HOLD")
             if same_bar_exit is not None:
                 equity, trade = _close_position(position, row["open_time"], same_bar_exit, equity, fee_rate, slippage_rate, same_bar_reason)
@@ -116,18 +136,90 @@ def _exit_decision(
     if position.side == "LONG":
         if close <= position.stop_price:
             return position.stop_price, "STOP_LOSS"
-        if close >= position.take_price:
+        trailing_exit = _dynamic_take_profit_decision(position, close)
+        if trailing_exit is not None:
+            return trailing_exit, "TRAIL_TAKE_PROFIT"
+        if not _dynamic_take_profit_enabled(position) and close >= position.take_price:
             return position.take_price, "TAKE_PROFIT"
         if signal == "SHORT":
             return signal_price if signal_price is not None else close, "REVERSE_SIGNAL"
     else:
         if close >= position.stop_price:
             return position.stop_price, "STOP_LOSS"
-        if close <= position.take_price:
+        trailing_exit = _dynamic_take_profit_decision(position, close)
+        if trailing_exit is not None:
+            return trailing_exit, "TRAIL_TAKE_PROFIT"
+        if not _dynamic_take_profit_enabled(position) and close <= position.take_price:
             return position.take_price, "TAKE_PROFIT"
         if signal == "LONG":
             return signal_price if signal_price is not None else close, "REVERSE_SIGNAL"
     return None, ""
+
+
+def _dynamic_take_profit_decision(position: Position, close: float) -> float | None:
+    if not _dynamic_take_profit_enabled(position):
+        return None
+    if position.side == "LONG":
+        if not position.take_profit_armed:
+            if close >= position.take_price:
+                position.take_profit_armed = True
+                _ratchet_take_profit(position, close)
+            return None
+        if close < position.take_price:
+            return position.take_price
+        _ratchet_take_profit(position, close)
+        return None
+
+    if not position.take_profit_armed:
+        if close <= position.take_price:
+            position.take_profit_armed = True
+            _ratchet_take_profit(position, close)
+        return None
+    if close > position.take_price:
+        return position.take_price
+    _ratchet_take_profit(position, close)
+    return None
+
+
+def _dynamic_take_profit_enabled(position: Position) -> bool:
+    start = _take_atr_start(position)
+    return (
+        position.atr is not None
+        and position.atr > 0
+        and position.take_atr_step > 0
+        and position.take_atr_max > start > 0
+    )
+
+
+def _ratchet_take_profit(position: Position, close: float) -> None:
+    assert position.atr is not None
+    start = _take_atr_start(position)
+    if position.side == "LONG":
+        raw_multiple = (close - position.entry_price) / position.atr
+        if raw_multiple < start:
+            return
+        steps = int((raw_multiple - start) / position.take_atr_step)
+        target_multiple = min(position.take_atr_max, start + steps * position.take_atr_step)
+        candidate = position.entry_price + target_multiple * position.atr * (1 - position.take_atr_buffer_pct)
+        if candidate > position.take_price:
+            position.take_price = candidate
+    else:
+        raw_multiple = (position.entry_price - close) / position.atr
+        if raw_multiple < start:
+            return
+        steps = int((raw_multiple - start) / position.take_atr_step)
+        target_multiple = min(position.take_atr_max, start + steps * position.take_atr_step)
+        candidate = position.entry_price - target_multiple * position.atr * (1 - position.take_atr_buffer_pct)
+        if candidate < position.take_price:
+            position.take_price = candidate
+
+
+def _take_atr_start(position: Position) -> float:
+    if position.take_atr_start > 0:
+        return position.take_atr_start
+    if not position.atr:
+        return 0.0
+    return abs(position.take_price - position.entry_price) / position.atr
 
 
 def _close_position(

@@ -20,6 +20,9 @@ class StrategyParams:
     short_rsi_max: float = 58.0
     stop_atr: float = 2.4
     take_atr: float = 4.2
+    take_atr_step: float = 0.0
+    take_atr_max: float = 0.0
+    take_atr_buffer_pct: float = 0.0
     volume_mult: float = 0.75
 
     def to_dict(self) -> dict[str, Any]:

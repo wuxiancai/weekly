@@ -62,6 +62,37 @@ class BacktestTests(unittest.TestCase):
         self.assertIsNone(exit_price)
         self.assertEqual(exit_reason, "")
 
+    def test_dynamic_take_profit_ratchets_before_exit(self) -> None:
+        position = Position(
+            side="LONG",
+            signal_time=1,
+            entry_time=2,
+            entry_price=100.0,
+            quantity=1.0,
+            stop_price=76.0,
+            take_price=180.0,
+            entry_equity=1000.0,
+            atr=10.0,
+            take_atr_step=0.5,
+            take_atr_max=10.0,
+        )
+
+        exit_price, exit_reason = _exit_decision(position, high=190.0, low=170.0, close=190.0, signal="HOLD")
+
+        self.assertIsNone(exit_price)
+        self.assertEqual(exit_reason, "")
+        self.assertEqual(position.take_price, 190.0)
+
+        exit_price, exit_reason = _exit_decision(position, high=196.0, low=189.0, close=195.0, signal="HOLD")
+        self.assertIsNone(exit_price)
+        self.assertEqual(exit_reason, "")
+        self.assertEqual(position.take_price, 195.0)
+
+        exit_price, exit_reason = _exit_decision(position, high=196.0, low=180.0, close=194.0, signal="HOLD")
+
+        self.assertEqual(exit_price, 195.0)
+        self.assertEqual(exit_reason, "TRAIL_TAKE_PROFIT")
+
     def test_signal_allows_long_reentry_after_pullback_reclaims_trend(self) -> None:
         params = StrategyParams(volume_mult=1.0, long_rsi_min=35, long_rsi_max=85)
         previous = {
