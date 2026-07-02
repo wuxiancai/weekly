@@ -41,10 +41,20 @@ if [ ! -d ".venv" ]; then
 fi
 
 . .venv/bin/activate
-python -m pip install --upgrade pip >/dev/null
-python -m pip install -r requirements.txt
+VENV_PYTHON="$ROOT_DIR/.venv/bin/python"
+if [ ! -x "$VENV_PYTHON" ]; then
+  if [ -x "$ROOT_DIR/.venv/bin/python3" ]; then
+    VENV_PYTHON="$ROOT_DIR/.venv/bin/python3"
+  else
+    echo "虚拟环境里未找到 Python，请删除 .venv 后重新执行 start.sh。"
+    exit 1
+  fi
+fi
 
-PORT="$(python - "$REQUESTED_PORT" <<'PY'
+"$VENV_PYTHON" -m pip install --upgrade pip >/dev/null
+"$VENV_PYTHON" -m pip install -r requirements.txt
+
+PORT="$("$VENV_PYTHON" - "$REQUESTED_PORT" <<'PY'
 import socket
 import sys
 
@@ -63,5 +73,4 @@ echo "系统: ${PLATFORM}"
 echo "监听: http://127.0.0.1:${PORT} 以及 http://0.0.0.0:${PORT}"
 echo "停止: Ctrl+C"
 
-exec python -m uvicorn app.main:app --host "$HOST" --port "$PORT"
-
+exec "$VENV_PYTHON" -m uvicorn app.main:app --host "$HOST" --port "$PORT"
