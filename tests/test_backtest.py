@@ -2,7 +2,7 @@ import unittest
 
 from app.backtest import Position, _exit_decision, run_backtest
 from app.config import DEFAULTS
-from app.main import HTML
+from app.main import ETH_HTML, HTML
 from app.optimizer import walk_forward_optimize
 from app.strategy import StrategyParams, enrich_candles, signal_for
 
@@ -44,6 +44,15 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("盈亏比", HTML)
         self.assertIn("最大回撤", HTML)
         self.assertIn("收益回撤比", HTML)
+
+    def test_home_links_to_eth_daily_backtest_page(self) -> None:
+        self.assertIn('href="/eth">ETH 回测</a>', HTML)
+        self.assertIn("ETHUSDT U本位永续合约日线回测系统", ETH_HTML)
+        self.assertIn('href="/">BTC 回测</a>', ETH_HTML)
+        self.assertIn('value="ETHUSDT"', ETH_HTML)
+        self.assertIn('value="1d"', ETH_HTML)
+        self.assertIn('id="takeAtr" type="number" step="0.1" value="6.5"', ETH_HTML)
+        self.assertIn('id="takeAtrMax" type="number" step="0.5" value="24"', ETH_HTML)
 
     def test_ma40_blocks_signals_until_40_weekly_candles_exist(self) -> None:
         rows_before = enrich_candles(_sample_candles(39), StrategyParams())

@@ -50,6 +50,11 @@ def index() -> str:
     return HTML
 
 
+@app.get("/eth", response_class=HTMLResponse)
+def eth_index() -> str:
+    return ETH_HTML
+
+
 @app.post("/api/sync")
 def sync_data(
     symbol: str = DEFAULTS.symbol,
@@ -226,6 +231,9 @@ HTML = """
     body { margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); }
     header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); background:#0c0e12; }
     h1 { margin:0; font-size:20px; font-weight:700; letter-spacing:0; }
+    .header-actions { display:flex; align-items:center; gap:12px; }
+    .nav-button { display:inline-flex; align-items:center; justify-content:center; min-height:34px; padding:0 12px; border:1px solid #3b4654; border-radius:6px; color:var(--text); background:#202733; text-decoration:none; font-size:13px; font-weight:650; white-space:nowrap; }
+    .nav-button:hover { filter:brightness(1.12); }
     main { padding:18px; display:grid; gap:14px; }
     .toolbar, .grid, .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; }
     .toolbar { display:grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap:10px; padding:12px; align-items:end; }
@@ -259,7 +267,10 @@ HTML = """
 <body>
   <header>
     <h1>BTCUSDT U本位永续合约模拟交易系统</h1>
-    <div class="status" id="status">USDT 保证金 / USDT 结算，默认本金 10000，默认复利，2倍杠杆，EMA15 / MA40，周期 1w</div>
+    <div class="header-actions">
+      <a class="nav-button" href="/eth">ETH 回测</a>
+      <div class="status" id="status">USDT 保证金 / USDT 结算，默认本金 10000，默认复利，2倍杠杆，EMA15 / MA40，周期 1w</div>
+    </div>
   </header>
   <main>
     <section class="toolbar">
@@ -534,3 +545,16 @@ loadCandles().catch(() => {});
 </body>
 </html>
 """
+
+
+ETH_HTML = (
+    HTML.replace("BTCUSDT", "ETHUSDT")
+    .replace("ETHUSDT U本位永续合约模拟交易系统", "ETHUSDT U本位永续合约日线回测系统")
+    .replace('href="/eth">ETH 回测</a>', 'href="/">BTC 回测</a>')
+    .replace("周期 1w", "周期 1d")
+    .replace('value="1w"', 'value="1d"')
+    .replace("动态止盈启动 ATR 倍数。推荐：7.5", "动态止盈启动 ATR 倍数。推荐：6.5")
+    .replace('id="takeAtr" type="number" step="0.1" value="7.5"', 'id="takeAtr" type="number" step="0.1" value="6.5"')
+    .replace("动态止盈最高 ATR 倍数上限。推荐：32", "动态止盈最高 ATR 倍数上限。推荐：24")
+    .replace('id="takeAtrMax" type="number" step="0.5" value="32"', 'id="takeAtrMax" type="number" step="0.5" value="24"')
+)
