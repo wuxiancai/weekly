@@ -2,7 +2,7 @@ import unittest
 
 from app.backtest import Position, _exit_decision, run_backtest
 from app.optimizer import walk_forward_optimize
-from app.strategy import StrategyParams, enrich_candles
+from app.strategy import StrategyParams, enrich_candles, signal_for
 
 
 class BacktestTests(unittest.TestCase):
@@ -61,6 +61,31 @@ class BacktestTests(unittest.TestCase):
 
         self.assertIsNone(exit_price)
         self.assertEqual(exit_reason, "")
+
+    def test_signal_allows_long_reentry_after_pullback_reclaims_trend(self) -> None:
+        params = StrategyParams(volume_mult=1.0, long_rsi_min=35, long_rsi_max=85)
+        previous = {
+            "close": 96.0,
+            "ema": 100.0,
+            "ma": 90.0,
+        }
+        row = {
+            "close": 106.0,
+            "ema": 101.0,
+            "ma": 91.0,
+            "rsi": 60.0,
+            "atr": 5.0,
+            "macd_hist": -1.0,
+            "bb_upper": 105.0,
+            "bb_lower": 80.0,
+            "adx": 20.0,
+            "plus_di": 30.0,
+            "minus_di": 20.0,
+            "volume": 125.0,
+            "volume_sma": 100.0,
+        }
+
+        self.assertEqual(signal_for(row, params, previous), "LONG")
 
     def test_walk_forward_reports_train_and_test_metrics(self) -> None:
         candles = _sample_candles(140)

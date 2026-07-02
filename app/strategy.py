@@ -61,12 +61,13 @@ def enrich_candles(candles: list[dict[str, Any]], params: StrategyParams) -> lis
                 "volume_sma": vol_sma[i],
             }
         )
-        item["signal"] = signal_for(item, params)
+        previous = out[-1] if out else None
+        item["signal"] = signal_for(item, params, previous)
         out.append(item)
     return out
 
 
-def signal_for(row: dict[str, Any], params: StrategyParams) -> str:
+def signal_for(row: dict[str, Any], params: StrategyParams, previous: dict[str, Any] | None = None) -> str:
     required = ["ema", "ma", "rsi", "atr", "macd_hist", "bb_upper", "bb_lower", "adx", "volume_sma"]
     if any(row.get(key) is None for key in required):
         return "HOLD"
@@ -85,13 +86,26 @@ def signal_for(row: dict[str, Any], params: StrategyParams) -> str:
 
     if trend_long and momentum_long and strong_trend and long_rsi_ok and not_upper_chase and volume_ok:
         return "LONG"
+    if _long_trend_reentry(row, previous) and strong_trend and long_rsi_ok and volume_ok:
+        return "LONG"
     if trend_short and momentum_short and strong_trend and short_rsi_ok and not_lower_chase and volume_ok:
         return "SHORT"
     return "HOLD"
+
+
+def _long_trend_reentry(row: dict[str, Any], previous: dict[str, Any] | None) -> bool:
+    if previous is None or previous.get("ema") is None or previous.get("ma") is None:
+        return False
+    close = float(row["close"])
+    previous_close = float(previous["close"])
+    reclaimed_ema = previous_close <= float(previous["ema"]) and close > float(row["ema"])
+    reclaimed_ma = previous_close <= float(previous["ma"]) and close > float(row["ma"])
+    trend_still_long = row["ema"] > row["ma"] and close > row["ema"]
+    direction_ok = row["plus_di"] is not None and row["minus_di"] is not None and row["plus_di"] > row["minus_di"]
+    return trend_still_long and direction_ok and (reclaimed_ema or reclaimed_ma)
 
 
 def params_from_dict(data: dict[str, Any]) -> StrategyParams:
     allowed = StrategyParams().__dict__.keys()
     clean = {key: data[key] for key in allowed if key in data and data[key] is not None}
     return StrategyParams(**clean)
-
