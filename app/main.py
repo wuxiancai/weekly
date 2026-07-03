@@ -383,11 +383,11 @@ const STRATEGY_DEFAULTS = {
       regimeSwitch: false, trendMaGapMin: 0.006, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 35, rangeRsiHigh: 65
     },
     '4h': {
-      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 2,
-      feeRate: 0.0005, slippageRate: 0.0005, ema: 15, ma: 40, rsiPeriod: 14, atrPeriod: 14,
-      adxPeriod: 14, adx: 0, longRsiMin: 35, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
-      stopAtr: 1.8, takeAtr: 6.5, takeAtrStep: 1.25, takeAtrMax: 24, takeAtrBuffer: 0, volumeMult: 1,
-      regimeSwitch: false, trendMaGapMin: 0.006, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 35, rangeRsiHigh: 65
+      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 8, ma: 35, rsiPeriod: 14, atrPeriod: 14,
+      adxPeriod: 14, adx: 25, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8, takeAtrBuffer: 0, volumeMult: 1,
+      regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 30, rangeRsiHigh: 65
     }
   }
 };
