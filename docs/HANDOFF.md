@@ -258,6 +258,34 @@
 ## 2026-07-03 4h 独立周期默认参数与基准回测
 
 - 用户要求按新增 `1d` 的逻辑再增加 `4h` 交易策略，并且 `4h` 必须与周线、日线完全独立。
+
+## 2026-07-03 实盘模拟 / Paper Trading 更新
+
+- 新增 `app/paper.py`：
+  - 默认共享模拟账户 `1000 USDT`。
+  - 默认运行 `BTCUSDT / 4h` 与 `ETHUSDT / 4h` 两个独立策略。
+  - 复用现有 `StrategyParams`、`enrich_candles()`、`Position`、ATR 止损、动态止盈、U本位 PnL 计算。
+  - SQLite 表包括 `paper_accounts`、`paper_strategies`、`paper_positions`、`paper_trades`、`paper_equity_curve`、`paper_events`。
+  - `process_strategy()` 按 `last_processed_open_time` 增量处理，防止重复处理同一根 K 线。
+  - `prime_strategy()` 用于首次启动：只预热历史 K 线并标记最新已收盘 K 线，不把历史信号模拟成交。
+- 新增 `app/paper_runner.py`：
+  - REST 轮询 Binance Futures 已收盘 K 线。
+  - 默认 `PAPER_WARMUP_CANDLES=500`、`PAPER_POLL_SECONDS=60`。
+  - 每轮同步 K 线、处理增量信号、记录运行事件；异常写入 `paper_events`。
+- Web 更新：
+  - 首页右上角新增 `模拟交易`，进入 `/paper`。
+  - 新增 `/api/paper/status`，返回模拟账户、策略、持仓、最近平仓、权益曲线和运行日志。
+  - `/paper` 页面展示模拟账户资金、当前持仓、策略状态、最近平仓和运行日志。
+- 部署更新：
+  - 新增 `scripts/run_paper.sh`，使用项目 `.venv` 运行 `app.paper_runner`。
+  - 新增 `scripts/deploy_one_click.sh`，自适应 Ubuntu 安装依赖，创建虚拟环境，安装 Python requirements，并写入两个 systemd 服务：
+    - `weekly-web`：运行 Web，监听 `0.0.0.0:${PORT:-8000}`。
+    - `weekly-paper`：运行模拟交易 runner。
+  - 一键部署后访问 `http://服务器IP:8000/paper` 查看实盘模拟状态。
+- 本轮验证：
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：29 个测试通过。
+  - `bash -n scripts/deploy_one_click.sh scripts/run_paper.sh start.sh scripts/start.sh` 通过。
 - 页面 `周期` 下拉已新增 `4h`。
 - `STRATEGY_DEFAULTS` 已新增独立 4h 默认参数：
   - `BTCUSDT / 4h`：当前先复制 `BTCUSDT / 1d` 默认参数，`EMA8 / MA40`、无杠杆、复利、止损 `1.6 ATR`、动态止盈启动 `13 ATR`、止盈阶梯 `0.75 ATR`、止盈上限 `18 ATR`、量能 `0.75`。

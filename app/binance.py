@@ -44,6 +44,30 @@ class BinanceClient:
                 break
         return [row for row in rows if start_ms <= row["open_time"] <= end_ms]
 
+    def fetch_klines_ms(
+        self,
+        symbol: str,
+        interval: str,
+        start_ms: int,
+        end_ms: int,
+        limit: int = 1500,
+    ) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        cursor = start_ms
+        while cursor <= end_ms:
+            payload = self._get_klines(symbol, interval, cursor, end_ms, limit)
+            if not payload:
+                break
+            rows.extend(self._normalize_kline(symbol, interval, item) for item in payload)
+            next_cursor = int(payload[-1][0]) + 1
+            if next_cursor <= cursor:
+                break
+            cursor = next_cursor
+            time.sleep(0.15)
+            if len(payload) < limit:
+                break
+        return [row for row in rows if start_ms <= row["open_time"] <= end_ms]
+
     def _get_klines(self, symbol: str, interval: str, start_ms: int, end_ms: int, limit: int) -> list[list[Any]]:
         response = requests.get(
             f"{self.base_url}/fapi/v1/klines",
@@ -74,4 +98,3 @@ class BinanceClient:
             "quote_volume": float(item[7]),
             "trades": int(item[8]),
         }
-

@@ -10,6 +10,7 @@ from .backtest import run_backtest
 from .binance import BinanceClient
 from .config import DEFAULTS
 from .db import (
+    connect,
     init_db,
     insert_backtest_run,
     insert_optimization_result,
@@ -20,6 +21,7 @@ from .db import (
     upsert_candles,
 )
 from .optimizer import optimize, walk_forward_optimize
+from .paper import PaperEngine, init_paper_schema
 from .strategy import StrategyParams, enrich_candles, params_from_dict
 from .timeutils import ms_to_date, parse_date_ms
 
@@ -43,6 +45,9 @@ class BacktestRequest(BaseModel):
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+    with connect() as conn:
+        init_paper_schema(conn)
+        PaperEngine(conn).initialize()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -53,6 +58,19 @@ def index() -> str:
 @app.get("/eth", response_class=HTMLResponse)
 def eth_index() -> str:
     return ETH_HTML
+
+
+@app.get("/paper", response_class=HTMLResponse)
+def paper_index() -> str:
+    return PAPER_HTML
+
+
+@app.get("/api/paper/status")
+def paper_status() -> dict[str, Any]:
+    with connect() as conn:
+        init_paper_schema(conn)
+        engine = PaperEngine(conn)
+        return engine.status()
 
 
 @app.post("/api/sync")
@@ -268,6 +286,7 @@ HTML = """
   <header>
     <h1>BTCUSDT U本位永续合约模拟交易系统</h1>
     <div class="header-actions">
+      <a class="nav-button" href="/paper">模拟交易</a>
       <a class="nav-button" href="/eth">ETH 回测</a>
       <div class="status" id="status">USDT 保证金 / USDT 结算，默认本金 10000，默认复利，2倍杠杆，EMA15 / MA40，周期 1w</div>
     </div>
@@ -650,6 +669,116 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('interval').value = PAGE_INTERVAL;
   applyIntervalDefaults();
 });
+</script>
+</body>
+</html>
+"""
+
+
+PAPER_HTML = """
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>模拟交易状态</title>
+  <style>
+    :root { color-scheme: dark; --bg:#101216; --panel:#171b22; --line:#2a303a; --text:#e8edf5; --muted:#8d97a8; --green:#25c486; --red:#ff5266; --blue:#66b7ff; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); }
+    header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); background:#0c0e12; }
+    h1 { margin:0; font-size:20px; }
+    main { padding:18px; display:grid; gap:14px; }
+    .nav { display:flex; gap:10px; align-items:center; }
+    a, button { border:1px solid #3b4654; background:#202733; color:var(--text); border-radius:6px; padding:9px 12px; text-decoration:none; cursor:pointer; font-weight:650; }
+    .grid { display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--panel); }
+    .metric { padding:14px; border-right:1px solid var(--line); }
+    .metric:last-child { border-right:0; }
+    .metric span { display:block; color:var(--muted); font-size:12px; margin-bottom:7px; }
+    .metric strong { font-size:22px; }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; overflow:auto; }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    th, td { border-bottom:1px solid var(--line); padding:8px; text-align:right; white-space:nowrap; }
+    th:first-child, td:first-child { text-align:left; }
+    th { color:var(--muted); }
+    .muted { color:var(--muted); }
+    .pos { color:var(--green); }
+    .neg { color:var(--red); }
+    @media (max-width: 900px) { .grid { grid-template-columns:repeat(2,1fr); } header { align-items:flex-start; flex-direction:column; gap:12px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>BTCUSDT / ETHUSDT U本位永续合约模拟交易</h1>
+    <div class="nav">
+      <a href="/">BTC 回测</a>
+      <a href="/eth">ETH 回测</a>
+      <button onclick="loadStatus()">刷新</button>
+    </div>
+  </header>
+  <main>
+    <section class="grid">
+      <div class="metric"><span>模拟账户资金(USDT)</span><strong id="equity">-</strong></div>
+      <div class="metric"><span>初始资金(USDT)</span><strong id="initial">1000.00</strong></div>
+      <div class="metric"><span>复利</span><strong id="compound">YES</strong></div>
+      <div class="metric"><span>杠杆</span><strong id="leverage">0</strong></div>
+    </section>
+    <section class="panel">
+      <h2>当前持仓</h2>
+      <table><thead><tr><th>交易对</th><th>周期</th><th>方向</th><th>入场时间</th><th>入场价</th><th>数量</th><th>止损</th><th>保护/止盈</th></tr></thead><tbody id="positions"></tbody></table>
+    </section>
+    <section class="panel">
+      <h2>策略状态</h2>
+      <table><thead><tr><th>交易对</th><th>周期</th><th>启用</th><th>最后处理 K 线</th><th>参数</th></tr></thead><tbody id="strategies"></tbody></table>
+    </section>
+    <section class="panel">
+      <h2>最近平仓</h2>
+      <table><thead><tr><th>交易对</th><th>方向</th><th>入场</th><th>出场</th><th>入场价</th><th>出场价</th><th>收益(USDT)</th><th>收益率</th><th>原因</th></tr></thead><tbody id="trades"></tbody></table>
+    </section>
+    <section class="panel">
+      <h2>运行日志</h2>
+      <table><thead><tr><th>时间</th><th>交易对</th><th>类型</th><th>内容</th></tr></thead><tbody id="events"></tbody></table>
+    </section>
+  </main>
+<script>
+async function loadStatus() {
+  const res = await fetch('/api/paper/status');
+  const data = await res.json();
+  const account = data.account || {};
+  document.getElementById('equity').textContent = Number(account.equity || 0).toFixed(2);
+  document.getElementById('initial').textContent = Number(account.initial_equity || 1000).toFixed(2);
+  document.getElementById('compound').textContent = account.compound ? 'YES' : 'NO';
+  document.getElementById('leverage').textContent = Number(account.leverage || 0).toFixed(2);
+  fillStrategies(data.strategies || []);
+  fillPositions(data.positions || []);
+  fillTrades(data.trades || []);
+  fillEvents(data.events || []);
+}
+function date(ms) { return ms ? new Date(Number(ms)).toLocaleString() : '-'; }
+function fillStrategies(items) {
+  document.getElementById('strategies').innerHTML = items.map(s => `
+    <tr><td>${s.symbol}</td><td>${s.interval}</td><td>${s.enabled ? 'YES' : 'NO'}</td><td>${date(s.last_processed_open_time)}</td><td class="muted">${summary(s.params)}</td></tr>
+  `).join('');
+}
+function fillPositions(items) {
+  document.getElementById('positions').innerHTML = items.map(p => `
+    <tr><td>${p.symbol}</td><td>${p.interval}</td><td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${date(p.entry_time)}</td><td>${Number(p.entry_price).toFixed(2)}</td><td>${Number(p.quantity).toFixed(6)}</td><td>${Number(p.stop_price).toFixed(2)}</td><td>${Number(p.take_price).toFixed(2)}</td></tr>
+  `).join('') || '<tr><td colspan="8" class="muted">暂无持仓</td></tr>';
+}
+function fillTrades(items) {
+  document.getElementById('trades').innerHTML = items.map(t => `
+    <tr><td>${t.symbol}</td><td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td><td>${date(t.entry_time)}</td><td>${date(t.exit_time)}</td><td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td><td>${Number(t.pnl_pct).toFixed(2)}%</td><td>${t.exit_reason}</td></tr>
+  `).join('') || '<tr><td colspan="9" class="muted">暂无平仓记录</td></tr>';
+}
+function fillEvents(items) {
+  document.getElementById('events').innerHTML = items.map(e => `
+    <tr><td>${date(e.event_time)}</td><td>${e.symbol} ${e.interval}</td><td>${e.event_type}</td><td class="muted">${JSON.stringify(e.payload)}</td></tr>
+  `).join('') || '<tr><td colspan="4" class="muted">暂无运行日志</td></tr>';
+}
+function summary(p) {
+  return `EMA${p.ema_period}/MA${p.ma_period}, ADX${p.adx_min}, RSI ${p.long_rsi_min}-${p.long_rsi_max}, SL${p.stop_atr}, TP${p.take_atr}, Step${p.take_atr_step}, Max${p.take_atr_max}, Regime ${p.regime_switch ? 'YES' : 'NO'}`;
+}
+document.addEventListener('DOMContentLoaded', loadStatus);
 </script>
 </body>
 </html>

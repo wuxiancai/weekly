@@ -14,4 +14,7 @@
 - [x] 增加 Walk-forward / 样本外验证，降低过拟合风险。
 - [x] 回测执行改为上一根已收盘 K 线出信号、下一根 K 线开盘成交，规避未来函数。
 - [x] 新增根目录 `start.sh`，自适应 macOS/Ubuntu 一键启动。
+- [x] 建立 BTCUSDT / ETHUSDT 4h 实盘模拟运行态，默认共享 `1000 USDT` 模拟账户。
+- [x] 新增 `/paper` 模拟交易状态页和 `/api/paper/status`。
+- [x] 新增 `scripts/deploy_one_click.sh` 一键部署脚本，安装 Web 与 Paper runner 两个 systemd 服务。
 - [ ] 增加资金费率、强平价、杠杆保证金模型。
