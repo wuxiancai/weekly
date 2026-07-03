@@ -354,8 +354,8 @@ const STRATEGY_DEFAULTS = {
     '4h': {
       start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
       feeRate: 0.0005, slippageRate: 0.0005, ema: 8, ma: 35, rsiPeriod: 14, atrPeriod: 14,
-      adxPeriod: 14, adx: 14, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
-      stopAtr: 0.8, takeAtr: 4.0, takeAtrStep: 0.5, takeAtrMax: 12.0, takeAtrBuffer: 0, volumeMult: 0.75
+      adxPeriod: 14, adx: 25, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8.0, takeAtrBuffer: 0, volumeMult: 1.0
     }
   },
   ETHUSDT: {
