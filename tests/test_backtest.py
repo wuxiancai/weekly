@@ -4,7 +4,7 @@ from app.backtest import Position, _exit_decision, run_backtest
 from app.config import DEFAULTS
 from app.main import ETH_HTML, HTML
 from app.optimizer import walk_forward_optimize
-from app.strategy import StrategyParams, enrich_candles, signal_for
+from app.strategy import StrategyParams, enrich_candles, market_regime_for, signal_for
 
 
 class BacktestTests(unittest.TestCase):
@@ -74,6 +74,8 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("ema: 8, ma: 35", HTML)
         self.assertIn("adx: 25, longRsiMin: 50, longRsiMax: 80", HTML)
         self.assertIn("stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8.0", HTML)
+        self.assertIn("regimeSwitch: true", HTML)
+        self.assertIn("rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 30, rangeRsiHigh: 65", HTML)
         self.assertIn("takeAtr: 6.5", HTML)
         self.assertIn("takeAtrMax: 24", HTML)
         self.assertIn("takeAtrMax: 32", HTML)
@@ -326,6 +328,57 @@ class BacktestTests(unittest.TestCase):
         }
 
         self.assertEqual(signal_for(row, params, previous), "LONG")
+
+    def test_regime_switch_uses_range_mean_reversion_signals(self) -> None:
+        params = StrategyParams(
+            regime_switch=True,
+            adx_min=25,
+            range_adx_max=18,
+            range_bb_width_max=0.08,
+            range_rsi_low=35,
+            range_rsi_high=65,
+        )
+        row = {
+            "close": 96.0,
+            "ema": 100.0,
+            "ma": 100.2,
+            "rsi": 31.0,
+            "atr": 2.0,
+            "macd_hist": -0.2,
+            "bb_mid": 100.0,
+            "bb_upper": 104.0,
+            "bb_lower": 96.0,
+            "adx": 14.0,
+            "plus_di": 18.0,
+            "minus_di": 20.0,
+            "volume": 80.0,
+            "volume_sma": 100.0,
+        }
+
+        self.assertEqual(market_regime_for(row, params), "RANGE")
+        self.assertEqual(signal_for(row, params), "LONG")
+
+    def test_regime_switch_blocks_ambiguous_neutral_signals(self) -> None:
+        params = StrategyParams(regime_switch=True, adx_min=25, range_adx_max=18, range_bb_width_max=0.08)
+        row = {
+            "close": 106.0,
+            "ema": 101.0,
+            "ma": 100.8,
+            "rsi": 60.0,
+            "atr": 2.0,
+            "macd_hist": 1.0,
+            "bb_mid": 100.0,
+            "bb_upper": 108.0,
+            "bb_lower": 92.0,
+            "adx": 21.0,
+            "plus_di": 30.0,
+            "minus_di": 18.0,
+            "volume": 160.0,
+            "volume_sma": 100.0,
+        }
+
+        self.assertEqual(market_regime_for(row, params), "NEUTRAL")
+        self.assertEqual(signal_for(row, params), "HOLD")
 
     def test_walk_forward_reports_train_and_test_metrics(self) -> None:
         candles = _sample_candles(140)

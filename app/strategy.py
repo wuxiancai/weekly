@@ -24,6 +24,12 @@ class StrategyParams:
     take_atr_max: float = 32.0
     take_atr_buffer_pct: float = 0.0
     volume_mult: float = 1.0
+    regime_switch: bool = False
+    trend_ma_gap_min: float = 0.006
+    range_adx_max: float = 18.0
+    range_bb_width_max: float = 0.08
+    range_rsi_low: float = 35.0
+    range_rsi_high: float = 65.0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -58,6 +64,7 @@ def enrich_candles(candles: list[dict[str, Any]], params: StrategyParams) -> lis
                 "bb_mid": bb_mid[i],
                 "bb_upper": bb_upper[i],
                 "bb_lower": bb_lower[i],
+                "bb_width": _bb_width(bb_mid[i], bb_upper[i], bb_lower[i]),
                 "adx": adx_values[i],
                 "plus_di": plus_di[i],
                 "minus_di": minus_di[i],
@@ -65,6 +72,7 @@ def enrich_candles(candles: list[dict[str, Any]], params: StrategyParams) -> lis
             }
         )
         previous = out[-1] if out else None
+        item["market_regime"] = market_regime_for(item, params)
         item["signal"] = signal_for(item, params, previous)
         out.append(item)
     return out
@@ -75,6 +83,39 @@ def signal_for(row: dict[str, Any], params: StrategyParams, previous: dict[str, 
     if any(row.get(key) is None for key in required):
         return "HOLD"
 
+    if params.regime_switch:
+        if row.get("bb_mid") is None:
+            return "HOLD"
+        regime = market_regime_for(row, params)
+        if regime == "TREND":
+            return _trend_signal_for(row, params, previous)
+        if regime == "RANGE":
+            return _range_signal_for(row, params)
+        return "HOLD"
+
+    return _trend_signal_for(row, params, previous)
+
+
+def market_regime_for(row: dict[str, Any], params: StrategyParams) -> str:
+    required = ["ema", "ma", "close", "bb_mid", "bb_upper", "bb_lower", "adx"]
+    if any(row.get(key) is None for key in required):
+        return "NEUTRAL"
+
+    close = float(row["close"])
+    ma_gap = abs(float(row["ema"]) - float(row["ma"])) / close if close else 0.0
+    bb_width = row.get("bb_width")
+    if bb_width is None:
+        bb_width = _bb_width(row.get("bb_mid"), row.get("bb_upper"), row.get("bb_lower"))
+    adx_value = float(row["adx"])
+
+    if adx_value >= params.adx_min and ma_gap >= params.trend_ma_gap_min:
+        return "TREND"
+    if adx_value <= params.range_adx_max and bb_width is not None and bb_width <= params.range_bb_width_max:
+        return "RANGE"
+    return "NEUTRAL"
+
+
+def _trend_signal_for(row: dict[str, Any], params: StrategyParams, previous: dict[str, Any] | None = None) -> str:
     close = float(row["close"])
     volume_ok = float(row["volume"]) >= float(row["volume_sma"]) * params.volume_mult
     trend_long = row["ema"] > row["ma"] and close > row["ema"]
@@ -94,6 +135,21 @@ def signal_for(row: dict[str, Any], params: StrategyParams, previous: dict[str, 
     if trend_short and momentum_short and strong_trend and short_rsi_ok and not_lower_chase and volume_ok:
         return "SHORT"
     return "HOLD"
+
+
+def _range_signal_for(row: dict[str, Any], params: StrategyParams) -> str:
+    close = float(row["close"])
+    if close <= float(row["bb_lower"]) * 1.01 and float(row["rsi"]) <= params.range_rsi_low:
+        return "LONG"
+    if close >= float(row["bb_upper"]) * 0.99 and float(row["rsi"]) >= params.range_rsi_high:
+        return "SHORT"
+    return "HOLD"
+
+
+def _bb_width(mid: float | None, upper: float | None, lower: float | None) -> float | None:
+    if mid is None or upper is None or lower is None or mid == 0:
+        return None
+    return (float(upper) - float(lower)) / float(mid)
 
 
 def _long_trend_reentry(row: dict[str, Any], previous: dict[str, Any] | None) -> bool:

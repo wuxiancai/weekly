@@ -299,6 +299,12 @@ HTML = """
       <label title="动态止盈最高 ATR 倍数上限。推荐：32。">止盈上限<input id="takeAtrMax" type="number" step="0.5" value="32"></label>
       <label title="动态止盈保护位缓冲比例。推荐：0。">止盈缓冲<input id="takeAtrBuffer" type="number" step="0.01" value="0"></label>
       <label title="成交量过滤倍数，当前量需大于成交量均线乘以该值。推荐：1。">量能倍数<input id="volumeMult" type="number" step="0.05" value="1"></label>
+      <label title="4h 状态切换策略。YES：先识别 TREND/RANGE/NEUTRAL，趋势市顺势，震荡市均值回归，过渡市少交易。推荐：4h YES，周线/日线 NO。">状态策略<select id="regimeSwitch"><option value="false" selected>NO</option><option value="true">YES</option></select></label>
+      <label title="趋势状态要求 EMA 与 MA 至少分离的比例。推荐：4h 0.006。">趋势间距<input id="trendMaGapMin" type="number" step="0.001" value="0.006"></label>
+      <label title="震荡状态 ADX 上限。低于该值且布林带收窄时按震荡处理。推荐：18。">震荡ADX<input id="rangeAdxMax" type="number" step="1" value="18"></label>
+      <label title="震荡状态布林带宽上限，(上轨-下轨)/中轨。推荐：0.08。">震荡带宽<input id="rangeBbWidthMax" type="number" step="0.005" value="0.08"></label>
+      <label title="震荡策略做多 RSI 阈值。低于该值且接近布林下轨时做多。推荐：35。">震荡多RSI<input id="rangeRsiLow" type="number" value="35"></label>
+      <label title="震荡策略做空 RSI 阈值。高于该值且接近布林上轨时做空。推荐：65。">震荡空RSI<input id="rangeRsiHigh" type="number" value="65"></label>
       <button class="primary" onclick="syncData()">同步 Binance 数据</button>
       <button onclick="runBacktest()">运行回测</button>
       <button onclick="runOptimize()">参数优化</button>
@@ -343,19 +349,22 @@ const STRATEGY_DEFAULTS = {
       start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 2,
       feeRate: 0.0005, slippageRate: 0.0005, ema: 15, ma: 40, rsiPeriod: 14, atrPeriod: 14,
       adxPeriod: 14, adx: 0, longRsiMin: 35, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
-      stopAtr: 1.8, takeAtr: 7.5, takeAtrStep: 1.25, takeAtrMax: 32, takeAtrBuffer: 0, volumeMult: 1
+      stopAtr: 1.8, takeAtr: 7.5, takeAtrStep: 1.25, takeAtrMax: 32, takeAtrBuffer: 0, volumeMult: 1,
+      regimeSwitch: false, trendMaGapMin: 0.006, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 35, rangeRsiHigh: 65
     },
     '1d': {
       start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
       feeRate: 0.0005, slippageRate: 0.0005, ema: 8, ma: 40, rsiPeriod: 14, atrPeriod: 14,
       adxPeriod: 14, adx: 0, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
-      stopAtr: 1.6, takeAtr: 13.0, takeAtrStep: 0.75, takeAtrMax: 18.0, takeAtrBuffer: 0, volumeMult: 0.75
+      stopAtr: 1.6, takeAtr: 13.0, takeAtrStep: 0.75, takeAtrMax: 18.0, takeAtrBuffer: 0, volumeMult: 0.75,
+      regimeSwitch: false, trendMaGapMin: 0.006, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 35, rangeRsiHigh: 65
     },
     '4h': {
       start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
       feeRate: 0.0005, slippageRate: 0.0005, ema: 8, ma: 35, rsiPeriod: 14, atrPeriod: 14,
       adxPeriod: 14, adx: 25, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
-      stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8.0, takeAtrBuffer: 0, volumeMult: 1.0
+      stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8.0, takeAtrBuffer: 0, volumeMult: 1.0,
+      regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 30, rangeRsiHigh: 65
     }
   },
   ETHUSDT: {
@@ -363,19 +372,22 @@ const STRATEGY_DEFAULTS = {
       start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 2,
       feeRate: 0.0005, slippageRate: 0.0005, ema: 15, ma: 40, rsiPeriod: 14, atrPeriod: 14,
       adxPeriod: 14, adx: 0, longRsiMin: 35, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
-      stopAtr: 1.8, takeAtr: 7.5, takeAtrStep: 1.25, takeAtrMax: 32, takeAtrBuffer: 0, volumeMult: 1
+      stopAtr: 1.8, takeAtr: 7.5, takeAtrStep: 1.25, takeAtrMax: 32, takeAtrBuffer: 0, volumeMult: 1,
+      regimeSwitch: false, trendMaGapMin: 0.006, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 35, rangeRsiHigh: 65
     },
     '1d': {
       start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 2,
       feeRate: 0.0005, slippageRate: 0.0005, ema: 15, ma: 40, rsiPeriod: 14, atrPeriod: 14,
       adxPeriod: 14, adx: 0, longRsiMin: 35, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
-      stopAtr: 1.8, takeAtr: 6.5, takeAtrStep: 1.25, takeAtrMax: 24, takeAtrBuffer: 0, volumeMult: 1
+      stopAtr: 1.8, takeAtr: 6.5, takeAtrStep: 1.25, takeAtrMax: 24, takeAtrBuffer: 0, volumeMult: 1,
+      regimeSwitch: false, trendMaGapMin: 0.006, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 35, rangeRsiHigh: 65
     },
     '4h': {
       start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 2,
       feeRate: 0.0005, slippageRate: 0.0005, ema: 15, ma: 40, rsiPeriod: 14, atrPeriod: 14,
       adxPeriod: 14, adx: 0, longRsiMin: 35, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
-      stopAtr: 1.8, takeAtr: 6.5, takeAtrStep: 1.25, takeAtrMax: 24, takeAtrBuffer: 0, volumeMult: 1
+      stopAtr: 1.8, takeAtr: 6.5, takeAtrStep: 1.25, takeAtrMax: 24, takeAtrBuffer: 0, volumeMult: 1,
+      regimeSwitch: false, trendMaGapMin: 0.006, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 35, rangeRsiHigh: 65
     }
   }
 };
@@ -409,6 +421,12 @@ function applyIntervalDefaults() {
   setValue('takeAtrMax', defaults.takeAtrMax);
   setValue('takeAtrBuffer', defaults.takeAtrBuffer);
   setValue('volumeMult', defaults.volumeMult);
+  document.getElementById('regimeSwitch').value = String(defaults.regimeSwitch);
+  setValue('trendMaGapMin', defaults.trendMaGapMin);
+  setValue('rangeAdxMax', defaults.rangeAdxMax);
+  setValue('rangeBbWidthMax', defaults.rangeBbWidthMax);
+  setValue('rangeRsiLow', defaults.rangeRsiLow);
+  setValue('rangeRsiHigh', defaults.rangeRsiHigh);
   setStatus(`${symbol} ${interval} 默认参数已应用`);
   loadCandles().catch(() => {});
 }
@@ -444,7 +462,13 @@ function payload() {
       take_atr_step: num('takeAtrStep'),
       take_atr_max: num('takeAtrMax'),
       take_atr_buffer_pct: num('takeAtrBuffer'),
-      volume_mult: num('volumeMult')
+      volume_mult: num('volumeMult'),
+      regime_switch: document.getElementById('regimeSwitch').value === 'true',
+      trend_ma_gap_min: num('trendMaGapMin'),
+      range_adx_max: num('rangeAdxMax'),
+      range_bb_width_max: num('rangeBbWidthMax'),
+      range_rsi_low: num('rangeRsiLow'),
+      range_rsi_high: num('rangeRsiHigh')
     }
   };
 }
@@ -557,7 +581,7 @@ function fillWalkForward(data) {
 }
 
 function paramSummary(p) {
-  return `EMA${p.ema_period}/MA${p.ma_period}, RSI${p.rsi_period} L${p.long_rsi_min}-${p.long_rsi_max} S${p.short_rsi_min}-${p.short_rsi_max}, ATR${p.atr_period}, ADX${p.adx_min}/${p.adx_period}, SL${p.stop_atr}, TP${p.take_atr}, Step${p.take_atr_step}, Max${p.take_atr_max}, Buf${p.take_atr_buffer_pct}, Vol${p.volume_mult}`;
+  return `EMA${p.ema_period}/MA${p.ma_period}, RSI${p.rsi_period} L${p.long_rsi_min}-${p.long_rsi_max} S${p.short_rsi_min}-${p.short_rsi_max}, ATR${p.atr_period}, ADX${p.adx_min}/${p.adx_period}, SL${p.stop_atr}, TP${p.take_atr}, Step${p.take_atr_step}, Max${p.take_atr_max}, Buf${p.take_atr_buffer_pct}, Vol${p.volume_mult}, Regime${p.regime_switch ? 'Y' : 'N'}`;
 }
 
 function drawChart(items, trades) {

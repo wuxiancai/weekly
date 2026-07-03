@@ -296,6 +296,48 @@
   - 盈利因子 `1.502`
 - 结论：当前 4h 默认仍不是高胜率策略，而是低胜率、高盈亏比、趋势捕捉型参数；相比上一组 `ADX>=14, TP=4, Max=12, Vol=0.75`，交易次数接近减半、盈利因子明显更高、权益曲线回撤更低。
 
+## 2026-07-03 BTCUSDT 4h 状态切换策略更新
+
+- 用户要求 4h 策略支持趋势和震荡两类行情。
+- `app/strategy.py` 新增 `market_regime_for()` 和 `regime_switch` 参数：
+  - `TREND`：`ADX >= adx_min` 且 EMA/MA 分离度达到 `trend_ma_gap_min`，沿用原趋势信号。
+  - `RANGE`：`ADX <= range_adx_max` 且布林带宽低于 `range_bb_width_max`，使用布林带 + RSI 均值回归。
+  - `NEUTRAL`：趋势和震荡都不明确时不开仓。
+- Web 页面新增可手动修改的状态策略参数：
+  - 状态策略 `regimeSwitch`
+  - 趋势间距 `trendMaGapMin`
+  - 震荡 ADX `rangeAdxMax`
+  - 震荡带宽 `rangeBbWidthMax`
+  - 震荡多 RSI `rangeRsiLow`
+  - 震荡空 RSI `rangeRsiHigh`
+- 当前 `BTCUSDT / 4h` 默认：
+  - `regimeSwitch = YES`
+  - `EMA8 / MA35`
+  - `ADX >= 25`
+  - `trend_ma_gap_min = 0`
+  - `range_adx_max = 18`
+  - `range_bb_width_max = 0.08`
+  - `range_rsi_low = 30`
+  - `range_rsi_high = 65`
+  - 止损 `0.8 ATR`、动态止盈启动 `3.5 ATR`、止盈阶梯 `0.5 ATR`、止盈上限 `8 ATR`
+  - 本金 `10000`、复利 `YES`、杠杆 `0`
+- 当前本地 BTCUSDT 4h 数据 `2019-09-08` 至 `2026-06-29` 的内存回测结果：
+  - 最终资金 `440399.81 USDT`
+  - 总收益率 `4304.00%`
+  - 最大单笔回撤 `9.73%`
+  - 周期权益曲线最大回撤 `34.16%`
+  - 交易 `538` 笔
+  - 胜率 `25.84%`
+  - 盈利因子 `1.5005`
+- 对比上一版单一趋势 4h 默认：
+  - 最终资金 `319351.51 USDT`
+  - 总收益率 `3093.52%`
+  - 周期权益曲线最大回撤 `40.23%`
+  - 交易 `460` 笔
+  - 胜率 `25.22%`
+  - 盈利因子 `1.5023`
+- 结论：新 4h 状态切换策略收益更高、权益曲线最大回撤更低，但交易次数增加，胜率仍低；它是趋势 + 震荡混合策略的第一版，不应被理解为高胜率策略。
+
 ## 启动
 
 ```bash
