@@ -307,7 +307,7 @@ HTML = """
     <section class="grid">
       <div class="metric"><span>最终资金(USDT)</span><strong id="finalEquity">-</strong></div>
       <div class="metric"><span>总收益率</span><strong id="returnPct">-</strong></div>
-      <div class="metric"><span>最大回撤</span><strong id="drawdown">-</strong></div>
+      <div class="metric"><span>最大单笔回撤</span><strong id="drawdown">-</strong></div>
       <div class="metric"><span>胜率</span><strong id="winRate">-</strong></div>
       <div class="metric"><span>交易次数</span><strong id="tradeCount">-</strong></div>
       <div class="metric"><span>收益回撤比</span><strong id="rdd">-</strong></div>
@@ -324,12 +324,12 @@ HTML = """
     </section>
     <section class="panel">
       <h2>参数优化结果</h2>
-      <table><thead><tr><th>排名</th><th>收益率</th><th>回撤</th><th>胜率</th><th>交易</th><th>参数</th></tr></thead><tbody id="optimizations"></tbody></table>
+      <table><thead><tr><th>排名</th><th>收益率</th><th>最大单笔回撤</th><th>胜率</th><th>交易</th><th>参数</th></tr></thead><tbody id="optimizations"></tbody></table>
     </section>
     <section class="panel">
       <h2>Walk-forward 样本外验证</h2>
       <div class="status" id="walkForwardRange">训练段选参，测试段只验证，不参与参数搜索</div>
-      <table><thead><tr><th>排名</th><th>训练收益</th><th>测试收益</th><th>测试回撤</th><th>测试胜率</th><th>测试交易</th><th>参数</th></tr></thead><tbody id="walkForward"></tbody></table>
+      <table><thead><tr><th>排名</th><th>训练收益</th><th>测试收益</th><th>测试最大单笔回撤</th><th>测试胜率</th><th>测试交易</th><th>参数</th></tr></thead><tbody id="walkForward"></tbody></table>
     </section>
   </main>
 <script>

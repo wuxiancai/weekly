@@ -42,6 +42,7 @@ class BacktestTests(unittest.TestCase):
         self.assertLess(HTML.index("逐笔交易"), HTML.index("参数优化结果"))
         self.assertIn("收益率", HTML)
         self.assertIn("盈亏比", HTML)
+        self.assertIn("最大单笔回撤", HTML)
         self.assertIn("最大回撤", HTML)
         self.assertIn("收益回撤比", HTML)
 
@@ -128,6 +129,31 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("reward_risk_ratio", trade)
         self.assertIn("max_drawdown_pct", trade)
         self.assertIn("return_drawdown_ratio", trade)
+
+    def test_metrics_report_max_trade_drawdown_separately_from_equity_drawdown(self) -> None:
+        candles = _sample_candles(140)
+        result = run_backtest(
+            candles,
+            StrategyParams(
+                adx_min=0,
+                volume_mult=0.0,
+                long_rsi_min=0,
+                long_rsi_max=100,
+                short_rsi_min=0,
+                short_rsi_max=100,
+                stop_atr=10.0,
+                take_atr=10.0,
+            ),
+        )
+
+        self.assertTrue(result["trades"])
+        self.assertIn("max_trade_drawdown_pct", result["metrics"])
+        self.assertIn("equity_max_drawdown_pct", result["metrics"])
+        self.assertEqual(
+            result["metrics"]["max_trade_drawdown_pct"],
+            max(trade["max_drawdown_pct"] for trade in result["trades"]),
+        )
+        self.assertEqual(result["metrics"]["max_drawdown_pct"], result["metrics"]["max_trade_drawdown_pct"])
 
     def test_zero_leverage_matches_unleveraged_backtest(self) -> None:
         candles = _sample_candles(140)
