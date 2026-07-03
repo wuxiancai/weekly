@@ -263,7 +263,7 @@
 
 - 新增 `app/paper.py`：
   - 默认共享模拟账户 `1000 USDT`。
-  - 默认运行 `BTCUSDT / 4h` 与 `ETHUSDT / 4h` 两个独立策略。
+  - 默认运行 `BTCUSDT / 1d`、`BTCUSDT / 4h`、`ETHUSDT / 1d`、`ETHUSDT / 4h` 四个独立策略。
   - 复用现有 `StrategyParams`、`enrich_candles()`、`Position`、ATR 止损、动态止盈、U本位 PnL 计算。
   - SQLite 表包括 `paper_accounts`、`paper_strategies`、`paper_positions`、`paper_trades`、`paper_equity_curve`、`paper_events`。
   - `process_strategy()` 按 `last_processed_open_time` 增量处理，防止重复处理同一根 K 线。
@@ -286,6 +286,16 @@
   - `python3 -m py_compile app/*.py` 通过。
   - `python3 -m unittest discover -s tests -v`：29 个测试通过。
   - `bash -n scripts/deploy_one_click.sh scripts/run_paper.sh start.sh scripts/start.sh` 通过。
+
+## 2026-07-03 Paper Trading 补充日线策略
+
+- 用户指出模拟交易系统也必须包含日线交易策略。
+- `paper_strategy_defaults()` 已改为默认四个策略：
+  - `BTCUSDT / 1d`：复用 BTC 日线默认 `EMA8 / MA40`、`ADX >= 0`、多头 RSI `50-80`、止损 `1.6 ATR`、动态止盈启动 `13 ATR`、阶梯 `0.75`、上限 `18`、量能 `0.75`。
+  - `BTCUSDT / 4h`：保留状态切换默认策略。
+  - `ETHUSDT / 1d`：复用 ETH 日线默认 `EMA15 / MA40`、`ADX >= 0`、多头 RSI `35-85`、止损 `1.8 ATR`、动态止盈启动 `6.5 ATR`、阶梯 `1.25`、上限 `24`、量能 `1`。
+  - `ETHUSDT / 4h`：保留状态切换默认策略。
+- `/paper` 状态页顶部改为展示策略周期 `1d / 4h`。
 - 页面 `周期` 下拉已新增 `4h`。
 - `STRATEGY_DEFAULTS` 已新增独立 4h 默认参数：
   - `BTCUSDT / 4h`：当前先复制 `BTCUSDT / 1d` 默认参数，`EMA8 / MA40`、无杠杆、复利、止损 `1.6 ATR`、动态止盈启动 `13 ATR`、止盈阶梯 `0.75 ATR`、止盈上限 `18 ATR`、量能 `0.75`。

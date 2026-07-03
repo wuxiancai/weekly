@@ -721,7 +721,7 @@ PAPER_HTML = """
       <div class="metric"><span>模拟账户资金(USDT)</span><strong id="equity">-</strong></div>
       <div class="metric"><span>初始资金(USDT)</span><strong id="initial">1000.00</strong></div>
       <div class="metric"><span>复利</span><strong id="compound">YES</strong></div>
-      <div class="metric"><span>杠杆</span><strong id="leverage">0</strong></div>
+      <div class="metric"><span>策略周期</span><strong>1d / 4h</strong></div>
     </section>
     <section class="panel">
       <h2>当前持仓</h2>

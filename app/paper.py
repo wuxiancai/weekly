@@ -41,7 +41,45 @@ class ProcessResult:
 
 
 def paper_strategy_defaults() -> list[PaperStrategyConfig]:
-    params = StrategyParams(
+    btc_daily = StrategyParams(
+        ema_period=8,
+        ma_period=40,
+        rsi_period=14,
+        atr_period=14,
+        adx_period=14,
+        adx_min=0,
+        long_rsi_min=50,
+        long_rsi_max=80,
+        short_rsi_min=0,
+        short_rsi_max=100,
+        stop_atr=1.6,
+        take_atr=13.0,
+        take_atr_step=0.75,
+        take_atr_max=18.0,
+        take_atr_buffer_pct=0.0,
+        volume_mult=0.75,
+        regime_switch=False,
+    )
+    eth_daily = StrategyParams(
+        ema_period=15,
+        ma_period=40,
+        rsi_period=14,
+        atr_period=14,
+        adx_period=14,
+        adx_min=0,
+        long_rsi_min=35,
+        long_rsi_max=85,
+        short_rsi_min=0,
+        short_rsi_max=100,
+        stop_atr=1.8,
+        take_atr=6.5,
+        take_atr_step=1.25,
+        take_atr_max=24.0,
+        take_atr_buffer_pct=0.0,
+        volume_mult=1.0,
+        regime_switch=False,
+    )
+    four_hour = StrategyParams(
         ema_period=8,
         ma_period=35,
         rsi_period=14,
@@ -66,8 +104,10 @@ def paper_strategy_defaults() -> list[PaperStrategyConfig]:
         range_rsi_high=65,
     )
     return [
-        PaperStrategyConfig("BTCUSDT", "4h", params),
-        PaperStrategyConfig("ETHUSDT", "4h", params),
+        PaperStrategyConfig("BTCUSDT", "1d", btc_daily),
+        PaperStrategyConfig("BTCUSDT", "4h", four_hour),
+        PaperStrategyConfig("ETHUSDT", "1d", eth_daily),
+        PaperStrategyConfig("ETHUSDT", "4h", four_hour),
     ]
 
 

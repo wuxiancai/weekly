@@ -260,7 +260,7 @@ BTCUSDT 日线默认策略参数按本轮无杠杆、复利、最大单笔回撤
 
 ## 0019 增加实盘模拟运行态与一键 systemd 部署
 
-新增 Paper Trading 运行态，用一个共享 `1000 USDT` 模拟账户同时运行 `BTCUSDT / 4h` 与 `ETHUSDT / 4h` 策略。模拟交易不提交真实订单，只读取 Binance USDⓈ-M Futures K 线，按现有回测同一套指标、信号、ATR 风控、动态止盈和 U本位 PnL 口径计算。
+新增 Paper Trading 运行态，用一个共享 `1000 USDT` 模拟账户同时运行 `BTCUSDT / 1d`、`BTCUSDT / 4h`、`ETHUSDT / 1d`、`ETHUSDT / 4h` 策略。模拟交易不提交真实订单，只读取 Binance USDⓈ-M Futures K 线，按现有回测同一套指标、信号、ATR 风控、动态止盈和 U本位 PnL 口径计算。
 
 关键约束：
 
