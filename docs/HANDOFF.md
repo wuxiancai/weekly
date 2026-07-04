@@ -500,6 +500,15 @@
   - `最大单笔回撤`：持仓期间最大不利浮亏。
   - `单笔最大亏损率`：最终平仓后最亏一笔的实现亏损率。
 
+## 2026-07-04 Paper 顶部实时行情与 UTC+8 时钟
+
+- 用户要求在 `/paper` 顶部标题与导航之间增加 BTC/ETH 永续合约实时行情和 UTC+8 实时读秒时间。
+- 新增 `/api/market/tickers`，通过 Binance USD-M Futures `24hr ticker` 拉取 `BTCUSDT`、`ETHUSDT` 的 `lastPrice` 与 `priceChangePercent`，返回口径标记为 `UTC+0`。
+- `/paper` 顶部新增两行紧凑状态条：
+  - 第一行显示 `BTC 永续`、`ETH 永续` 实时价格和 24h 涨跌率；涨为绿色，跌为红色。
+  - 第二行显示转换后的 `UTC+8 YYYY-MM-DD HH:mm:ss`，前端每秒读秒。
+- 前端每 10 秒刷新一次行情；“刷新”按钮会同时刷新 Paper 状态和行情。若 Binance 行情连接失败，会在行情条直接显示 `行情连接失败`。
+
 ## 启动
 
 ```bash

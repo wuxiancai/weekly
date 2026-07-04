@@ -73,6 +73,30 @@ def paper_status() -> dict[str, Any]:
         return engine.status()
 
 
+@app.get("/api/market/tickers")
+def market_tickers() -> dict[str, Any]:
+    symbols = ["BTCUSDT", "ETHUSDT"]
+    try:
+        rows = BinanceClient().fetch_24hr_tickers(symbols)
+    except Exception as exc:
+        raise HTTPException(502, f"Binance 行情连接失败：{exc}") from exc
+    by_symbol = {str(row.get("symbol", "")).upper(): row for row in rows}
+    items = []
+    for symbol in symbols:
+        row = by_symbol.get(symbol)
+        if row is None:
+            continue
+        items.append(
+            {
+                "symbol": symbol,
+                "price": float(row["lastPrice"]),
+                "change_pct": float(row["priceChangePercent"]),
+                "event_time": int(row.get("closeTime") or 0),
+            }
+        )
+    return {"timezone": "UTC+0", "items": items}
+
+
 @app.post("/api/sync")
 def sync_data(
     symbol: str = DEFAULTS.symbol,
@@ -705,6 +729,12 @@ PAPER_HTML = """
     header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); background:#0c0e12; }
     h1 { margin:0; font-size:20px; }
     main { padding:18px; display:grid; gap:14px; }
+    .market-ticker { min-width:420px; flex:1; max-width:560px; border:1px solid var(--line); border-radius:8px; padding:8px 12px; background:#11151b; }
+    .ticker-row { display:flex; align-items:center; justify-content:center; gap:14px; min-height:22px; white-space:nowrap; font-weight:700; }
+    .ticker-item { display:inline-flex; align-items:baseline; gap:7px; }
+    .ticker-label, .clock-label { color:var(--muted); font-size:12px; }
+    .ticker-price { font-size:16px; }
+    .ticker-change, .clock-value { font-size:13px; }
     .nav { display:flex; gap:10px; align-items:center; }
     a, button { border:1px solid #3b4654; background:#202733; color:var(--text); border-radius:6px; padding:9px 12px; text-decoration:none; cursor:pointer; font-weight:650; }
     .grid { display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--panel); }
@@ -720,16 +750,23 @@ PAPER_HTML = """
     .muted { color:var(--muted); }
     .pos { color:var(--green); }
     .neg { color:var(--red); }
-    @media (max-width: 900px) { .grid { grid-template-columns:repeat(2,1fr); } header { align-items:flex-start; flex-direction:column; gap:12px; } }
+    @media (max-width: 900px) { .grid { grid-template-columns:repeat(2,1fr); } header { align-items:stretch; flex-direction:column; gap:12px; } .market-ticker { min-width:0; max-width:none; width:100%; padding:8px 10px; } .ticker-row { justify-content:flex-start; gap:9px; overflow:auto; } .ticker-item { gap:4px; } .ticker-label, .clock-label { font-size:11px; } .ticker-price { font-size:14px; } .ticker-change, .clock-value { font-size:12px; } }
   </style>
 </head>
 <body>
   <header>
     <h1>BTCUSDT / ETHUSDT U本位永续合约模拟交易</h1>
+    <div class="market-ticker" id="marketTicker">
+      <div class="ticker-row">
+        <span class="ticker-item" id="tickerBtc"><span class="ticker-label">BTC 永续</span><span class="ticker-price">-</span><span class="ticker-change">-</span></span>
+        <span class="ticker-item" id="tickerEth"><span class="ticker-label">ETH 永续</span><span class="ticker-price">-</span><span class="ticker-change">-</span></span>
+      </div>
+      <div class="ticker-row"><span class="clock-label">UTC+8</span><span class="clock-value" id="utc8Clock">-</span></div>
+    </div>
     <div class="nav">
       <a href="/">BTC 回测</a>
       <a href="/eth">ETH 回测</a>
-      <button onclick="loadStatus()">刷新</button>
+      <button onclick="loadAll()">刷新</button>
     </div>
   </header>
   <main>
@@ -769,6 +806,42 @@ async function loadStatus() {
   fillTrades(data.trades || []);
   fillEvents(data.events || []);
 }
+function loadAll() {
+  loadStatus();
+  loadMarketTicker();
+}
+async function loadMarketTicker() {
+  try {
+    const res = await fetch('/api/market/tickers');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || '行情连接失败');
+    const bySymbol = Object.fromEntries((data.items || []).map(item => [item.symbol, item]));
+    fillTicker('tickerBtc', bySymbol.BTCUSDT);
+    fillTicker('tickerEth', bySymbol.ETHUSDT);
+  } catch (error) {
+    document.getElementById('tickerBtc').innerHTML = '<span class="ticker-label">BTC 永续</span><span class="ticker-change neg">行情连接失败</span>';
+    document.getElementById('tickerEth').innerHTML = '<span class="ticker-label">ETH 永续</span><span class="ticker-change neg">行情连接失败</span>';
+  }
+}
+function fillTicker(id, item) {
+  const el = document.getElementById(id);
+  if (!item) {
+    el.innerHTML = '<span class="ticker-label">永续</span><span class="ticker-change neg">暂无行情</span>';
+    return;
+  }
+  const label = item.symbol === 'BTCUSDT' ? 'BTC 永续' : 'ETH 永续';
+  const change = Number(item.change_pct || 0);
+  const cls = change >= 0 ? 'pos' : 'neg';
+  const sign = change >= 0 ? '+' : '';
+  el.innerHTML = `<span class="ticker-label">${label}</span><span class="ticker-price ${cls}">${Number(item.price).toFixed(2)}</span><span class="ticker-change ${cls}">${sign}${change.toFixed(2)}%</span>`;
+}
+function updateUtc8Clock() {
+  const now = new Date();
+  const utc8 = new Date(now.getTime() + (now.getTimezoneOffset() + 480) * 60000);
+  const pad = value => String(value).padStart(2, '0');
+  const text = `${utc8.getFullYear()}-${pad(utc8.getMonth() + 1)}-${pad(utc8.getDate())} ${pad(utc8.getHours())}:${pad(utc8.getMinutes())}:${pad(utc8.getSeconds())}`;
+  document.getElementById('utc8Clock').textContent = text;
+}
 function date(ms) { return ms ? new Date(Number(ms)).toLocaleString() : '-'; }
 function fillStrategies(items) {
   document.getElementById('strategies').innerHTML = items.map(s => `
@@ -793,7 +866,12 @@ function fillEvents(items) {
 function summary(p) {
   return `EMA${p.ema_period}/MA${p.ma_period}, ADX${p.adx_min}, RSI ${p.long_rsi_min}-${p.long_rsi_max}, SL${p.stop_atr}, TP${p.take_atr}, Step${p.take_atr_step}, Max${p.take_atr_max}, Regime ${p.regime_switch ? 'YES' : 'NO'}`;
 }
-document.addEventListener('DOMContentLoaded', loadStatus);
+document.addEventListener('DOMContentLoaded', () => {
+  loadAll();
+  updateUtc8Clock();
+  setInterval(updateUtc8Clock, 1000);
+  setInterval(loadMarketTicker, 10000);
+});
 </script>
 </body>
 </html>

@@ -68,6 +68,18 @@ class BinanceClient:
                 break
         return [row for row in rows if start_ms <= row["open_time"] <= end_ms]
 
+    def fetch_24hr_tickers(self, symbols: list[str]) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for symbol in symbols:
+            response = requests.get(
+                f"{self.base_url}/fapi/v1/ticker/24hr",
+                params={"symbol": symbol.upper()},
+                timeout=10,
+            )
+            response.raise_for_status()
+            rows.append(response.json())
+        return rows
+
     def _get_klines(self, symbol: str, interval: str, start_ms: int, end_ms: int, limit: int) -> list[list[Any]]:
         response = requests.get(
             f"{self.base_url}/fapi/v1/klines",

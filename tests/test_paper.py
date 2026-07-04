@@ -1,7 +1,8 @@
 import sqlite3
 import unittest
 
-from app.main import HTML
+import app.main as main
+from app.main import HTML, PAPER_HTML
 from app.paper import (
     PAPER_DEFAULT_INITIAL_EQUITY,
     PaperEngine,
@@ -85,6 +86,41 @@ class PaperTradingTests(unittest.TestCase):
 
     def test_web_page_links_to_paper_trading_status(self) -> None:
         self.assertIn('href="/paper">模拟交易</a>', HTML)
+
+    def test_paper_page_shows_realtime_futures_ticker_and_utc8_clock(self) -> None:
+        self.assertIn('id="marketTicker"', PAPER_HTML)
+        self.assertIn('id="tickerBtc"', PAPER_HTML)
+        self.assertIn('id="tickerEth"', PAPER_HTML)
+        self.assertIn('id="utc8Clock"', PAPER_HTML)
+        self.assertIn("BTC 永续", PAPER_HTML)
+        self.assertIn("ETH 永续", PAPER_HTML)
+        self.assertIn("UTC+8", PAPER_HTML)
+
+    def test_market_tickers_api_returns_btc_eth_futures_price_changes(self) -> None:
+        class FakeClient:
+            def fetch_24hr_tickers(self, symbols: list[str]) -> list[dict]:
+                self.symbols = symbols
+                return [
+                    {"symbol": "BTCUSDT", "lastPrice": "62498.30", "priceChangePercent": "1.23", "closeTime": 1783180800000},
+                    {"symbol": "ETHUSDT", "lastPrice": "3420.10", "priceChangePercent": "-0.45", "closeTime": 1783180801000},
+                ]
+
+        original_client = main.BinanceClient
+        fake = FakeClient()
+        main.BinanceClient = lambda: fake
+        try:
+            data = main.market_tickers()
+        finally:
+            main.BinanceClient = original_client
+
+        self.assertEqual(fake.symbols, ["BTCUSDT", "ETHUSDT"])
+        self.assertEqual(data["timezone"], "UTC+0")
+        self.assertEqual(data["items"][0]["symbol"], "BTCUSDT")
+        self.assertEqual(data["items"][0]["price"], 62498.3)
+        self.assertEqual(data["items"][0]["change_pct"], 1.23)
+        self.assertEqual(data["items"][1]["symbol"], "ETHUSDT")
+        self.assertEqual(data["items"][1]["price"], 3420.1)
+        self.assertEqual(data["items"][1]["change_pct"], -0.45)
 
 
 def _sample_4h_candles(count: int) -> list[dict]:
