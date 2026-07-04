@@ -573,6 +573,33 @@ http://127.0.0.1:8001
   - 目标测试红灯确认旧行为缺 `1w` 且页面硬编码。
   - 修改后目标测试通过：`test_paper_defaults_use_shared_1000_usdt_account_and_all_strategy_intervals`、`test_paper_engine_initializes_account_and_strategies_once`、`test_paper_page_derives_strategy_intervals_from_status`。
 
+## 2026-07-04 start.sh 手动后台启动修正
+
+- 用户指出：终端执行 `start.sh` 后不能关闭终端肯定不行；同时再次强调 `start.sh` 必须启动一切。
+- 根因：此前 `start.sh` 只有前台 supervisor 行为，适合 systemd 托管，但不适合 SSH 手动执行后关闭终端。
+- 修改：
+  - `./start.sh` 默认后台启动同一个 supervisor，写入 `runtime/start.pid`，日志写入 `runtime/logs/start.log`，终端可以关闭。
+  - `./start.sh --foreground` 前台启动同一个 supervisor，供 systemd 托管。
+  - `scripts/deploy_one_click.sh` 的 systemd `ExecStart` 已改为 `/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground`。
+  - Web 和 Paper runner 仍由根目录 `start.sh` 统一启动、监控和清理，没有恢复独立 `weekly-paper` 服务。
+- 手动启动：
+
+```bash
+./start.sh
+```
+
+- systemd 托管启动：
+
+```bash
+sudo systemctl restart weekly-web
+```
+
+- 手动停止：
+
+```bash
+kill $(cat runtime/start.pid)
+```
+
 ## 下一步建议
 
 1. 在页面点击“同步 Binance 数据”确认 2019-09-02 到 2026-06-29 的周线入库。

@@ -57,7 +57,7 @@ WorkingDirectory=${ROOT_DIR}
 Environment=HOST=${HOST}
 Environment=PORT=${PORT}
 Environment=PAPER_POLL_SECONDS=${PAPER_POLL_SECONDS}
-ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh
+ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground
 Restart=always
 RestartSec=5
 

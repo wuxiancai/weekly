@@ -4,6 +4,42 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
+START_MODE="${START_MODE:-daemon}"
+PASSTHROUGH_ARGS=()
+for arg in "$@"; do
+  case "$arg" in
+    --foreground)
+      START_MODE="foreground"
+      ;;
+    --daemon)
+      START_MODE="daemon"
+      ;;
+    --help|-h)
+      echo "用法: ./start.sh [--daemon|--foreground]"
+      echo "  --daemon      后台启动 Web 和 Paper，终端可关闭。默认行为。"
+      echo "  --foreground  前台启动 Web 和 Paper，供 systemd 托管。"
+      exit 0
+      ;;
+    *)
+      PASSTHROUGH_ARGS+=("$arg")
+      ;;
+  esac
+done
+
+mkdir -p runtime/logs
+
+if [ "$START_MODE" = "daemon" ]; then
+  nohup "$0" --foreground "${PASSTHROUGH_ARGS[@]}" >> runtime/logs/start.log 2>&1 &
+  SUPERVISOR_PID="$!"
+  echo "$SUPERVISOR_PID" > runtime/start.pid
+  echo "start.sh 已在后台启动: pid=${SUPERVISOR_PID}"
+  echo "日志: runtime/logs/start.log"
+  echo "停止: kill \$(cat runtime/start.pid) 或 systemctl stop weekly-web"
+  exit 0
+fi
+
+echo "$$" > runtime/start.pid
+
 OS_NAME="$(uname -s)"
 HOST="${HOST:-0.0.0.0}"
 REQUESTED_PORT="${PORT:-8001}"
@@ -180,9 +216,7 @@ echo "系统: ${PLATFORM}"
 echo "监听: http://127.0.0.1:${PORT} 以及 http://0.0.0.0:${PORT}"
 echo "回测系统: FastAPI Web/API"
 echo "模拟交易系统: Paper runner，每 ${PAPER_POLL_SECONDS} 秒轮询已收盘 K 线"
-echo "停止: Ctrl+C 或 systemctl stop weekly-web"
-
-mkdir -p runtime/logs
+echo "停止: kill \$(cat runtime/start.pid)、Ctrl+C 或 systemctl stop weekly-web"
 
 PAPER_PID=""
 WEB_PID=""

@@ -14,7 +14,7 @@ class DeployScriptTests(unittest.TestCase):
         self.assertIn('PORT="${PORT:-8001}"', script)
         self.assertIn("python3-venv", script)
         self.assertIn("systemctl enable", script)
-        self.assertIn("ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh", script)
+        self.assertIn("ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground", script)
         self.assertIn("LEGACY_PAPER_SERVICE", script)
         self.assertNotIn("ExecStart=/usr/bin/env bash ${ROOT_DIR}/scripts/run_paper.sh", script)
         self.assertNotIn('systemctl enable "${WEB_SERVICE}.service" "${PAPER_SERVICE}.service"', script)
@@ -31,6 +31,12 @@ class DeployScriptTests(unittest.TestCase):
         self.assertIn("resolve_web_port", script)
         self.assertIn("端口 ${port} 被本项目进程占用", script)
         self.assertIn("端口 ${port} 被其他应用占用", script)
+        self.assertIn('--foreground', script)
+        self.assertIn('START_MODE="${START_MODE:-daemon}"', script)
+        self.assertIn('nohup "$0" --foreground', script)
+        self.assertIn("runtime/start.pid", script)
+        self.assertIn("runtime/logs/start.log", script)
+        self.assertIn("start.sh 已在后台启动", script)
 
     def test_legacy_systemd_installer_defaults_to_port_8001(self) -> None:
         script = (ROOT / "scripts" / "install_systemd_service.sh").read_text()
