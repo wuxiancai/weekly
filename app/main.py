@@ -77,7 +77,7 @@ def paper_status() -> dict[str, Any]:
 def market_tickers() -> dict[str, Any]:
     symbols = ["BTCUSDT", "ETHUSDT"]
     try:
-        rows = BinanceClient().fetch_24hr_tickers(symbols)
+        rows = BinanceClient().fetch_utc_day_tickers(symbols)
     except Exception as exc:
         raise HTTPException(502, f"Binance 行情连接失败：{exc}") from exc
     by_symbol = {str(row.get("symbol", "")).upper(): row for row in rows}
@@ -86,12 +86,17 @@ def market_tickers() -> dict[str, Any]:
         row = by_symbol.get(symbol)
         if row is None:
             continue
+        price = float(row["lastPrice"])
+        utc_open_price = float(row["utcOpenPrice"])
+        change = price - utc_open_price
         items.append(
             {
                 "symbol": symbol,
-                "price": float(row["lastPrice"]),
-                "change_pct": float(row["priceChangePercent"]),
-                "event_time": int(row.get("closeTime") or 0),
+                "price": round(price, 4),
+                "utc_open_price": round(utc_open_price, 4),
+                "change": round(change, 4),
+                "change_pct": round(change / utc_open_price * 100, 4) if utc_open_price else 0.0,
+                "event_time": int(row.get("eventTime") or 0),
             }
         )
     return {"timezone": "UTC+0", "items": items}
@@ -729,7 +734,7 @@ PAPER_HTML = """
     header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); background:#0c0e12; }
     h1 { margin:0; font-size:20px; }
     main { padding:18px; display:grid; gap:14px; }
-    .market-ticker { min-width:420px; flex:1; max-width:560px; border:1px solid var(--line); border-radius:8px; padding:8px 12px; background:#11151b; }
+    .market-ticker { min-width:420px; flex:1; max-width:760px; border:1px solid var(--line); border-radius:8px; padding:8px 12px; background:#11151b; }
     .ticker-row { display:flex; align-items:center; justify-content:center; gap:14px; min-height:22px; white-space:nowrap; font-weight:700; }
     .ticker-item { display:inline-flex; align-items:baseline; gap:7px; }
     .ticker-label, .clock-label { color:var(--muted); font-size:12px; }
@@ -743,6 +748,7 @@ PAPER_HTML = """
     .metric span { display:block; color:var(--muted); font-size:12px; margin-bottom:7px; }
     .metric strong { font-size:22px; }
     .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; overflow:auto; }
+    .trade-records-scroll { max-height:214px; overflow-y:auto; border-bottom:1px solid var(--line); }
     table { width:100%; border-collapse:collapse; font-size:12px; }
     th, td { border-bottom:1px solid var(--line); padding:8px; text-align:right; white-space:nowrap; }
     th:first-child, td:first-child { text-align:left; }
@@ -760,8 +766,8 @@ PAPER_HTML = """
       <div class="ticker-row">
         <span class="ticker-item" id="tickerBtc"><span class="ticker-label">BTC 永续</span><span class="ticker-price">-</span><span class="ticker-change">-</span></span>
         <span class="ticker-item" id="tickerEth"><span class="ticker-label">ETH 永续</span><span class="ticker-price">-</span><span class="ticker-change">-</span></span>
+        <span class="ticker-item"><span class="clock-label">UTC+8</span><span class="clock-value" id="utc8Clock">-</span></span>
       </div>
-      <div class="ticker-row"><span class="clock-label">UTC+8</span><span class="clock-value" id="utc8Clock">-</span></div>
     </div>
     <div class="nav">
       <a href="/">BTC 回测</a>
@@ -785,6 +791,12 @@ PAPER_HTML = """
       <table><thead><tr><th>交易对</th><th>周期</th><th>启用</th><th>最后处理 K 线</th><th>参数</th></tr></thead><tbody id="strategies"></tbody></table>
     </section>
     <section class="panel">
+      <h2>交易记录</h2>
+      <div class="trade-records-scroll">
+        <table><thead><tr><th>交易对</th><th>方向</th><th>入场</th><th>出场</th><th>入场价</th><th>出场价</th><th>收益(USDT)</th><th>收益率</th><th>原因</th></tr></thead><tbody id="tradeRecords"></tbody></table>
+      </div>
+    </section>
+    <section class="panel">
       <h2>最近平仓</h2>
       <table><thead><tr><th>交易对</th><th>方向</th><th>入场</th><th>出场</th><th>入场价</th><th>出场价</th><th>收益(USDT)</th><th>收益率</th><th>原因</th></tr></thead><tbody id="trades"></tbody></table>
     </section>
@@ -803,6 +815,7 @@ async function loadStatus() {
   document.getElementById('compound').textContent = account.compound ? 'YES' : 'NO';
   fillStrategies(data.strategies || []);
   fillPositions(data.positions || []);
+  fillTradeRecords(data.trade_records || data.trades || []);
   fillTrades(data.trades || []);
   fillEvents(data.events || []);
 }
@@ -831,9 +844,10 @@ function fillTicker(id, item) {
   }
   const label = item.symbol === 'BTCUSDT' ? 'BTC 永续' : 'ETH 永续';
   const change = Number(item.change_pct || 0);
+  const changeAmount = Number(item.change || 0);
   const cls = change >= 0 ? 'pos' : 'neg';
   const sign = change >= 0 ? '+' : '';
-  el.innerHTML = `<span class="ticker-label">${label}</span><span class="ticker-price ${cls}">${Number(item.price).toFixed(2)}</span><span class="ticker-change ${cls}">${sign}${change.toFixed(2)}%</span>`;
+  el.innerHTML = `<span class="ticker-label">${label}</span><span class="ticker-price ${cls}">${Number(item.price).toFixed(2)}</span><span class="ticker-change ${cls}">${sign}${changeAmount.toFixed(2)}</span><span class="ticker-change ${cls}">${sign}${change.toFixed(2)}%</span>`;
 }
 function updateUtc8Clock() {
   const now = new Date();
@@ -853,10 +867,14 @@ function fillPositions(items) {
     <tr><td>${p.symbol}</td><td>${p.interval}</td><td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${date(p.entry_time)}</td><td>${Number(p.entry_price).toFixed(2)}</td><td>${Number(p.quantity).toFixed(6)}</td><td>${Number(p.stop_price).toFixed(2)}</td><td>${Number(p.take_price).toFixed(2)}</td></tr>
   `).join('') || '<tr><td colspan="8" class="muted">暂无持仓</td></tr>';
 }
+function tradeRow(t) {
+  return `<tr><td>${t.symbol}</td><td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td><td>${date(t.entry_time)}</td><td>${date(t.exit_time)}</td><td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td><td>${Number(t.pnl_pct).toFixed(2)}%</td><td>${t.exit_reason}</td></tr>`;
+}
+function fillTradeRecords(items) {
+  document.getElementById('tradeRecords').innerHTML = items.map(tradeRow).join('') || '<tr><td colspan="9" class="muted">暂无交易记录</td></tr>';
+}
 function fillTrades(items) {
-  document.getElementById('trades').innerHTML = items.map(t => `
-    <tr><td>${t.symbol}</td><td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td><td>${date(t.entry_time)}</td><td>${date(t.exit_time)}</td><td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td><td>${Number(t.pnl_pct).toFixed(2)}%</td><td>${t.exit_reason}</td></tr>
-  `).join('') || '<tr><td colspan="9" class="muted">暂无平仓记录</td></tr>';
+  document.getElementById('trades').innerHTML = items.map(tradeRow).join('') || '<tr><td colspan="9" class="muted">暂无平仓记录</td></tr>';
 }
 function fillEvents(items) {
   document.getElementById('events').innerHTML = items.map(e => `

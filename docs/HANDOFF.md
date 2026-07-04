@@ -503,12 +503,18 @@
 ## 2026-07-04 Paper 顶部实时行情与 UTC+8 时钟
 
 - 用户要求在 `/paper` 顶部标题与导航之间增加 BTC/ETH 永续合约实时行情和 UTC+8 实时读秒时间。
-- 新增 `/api/market/tickers`，通过 Binance USD-M Futures `24hr ticker` 拉取 `BTCUSDT`、`ETHUSDT` 的 `lastPrice` 与 `priceChangePercent`，返回口径标记为 `UTC+0`。
-- `/paper` 顶部新增两行紧凑状态条：
-  - 第一行显示 `BTC 永续`、`ETH 永续` 实时价格和 24h 涨跌率；涨为绿色，跌为红色。
-  - 第二行显示转换后的 `UTC+8 YYYY-MM-DD HH:mm:ss`，前端每秒读秒。
+- 新增 `/api/market/tickers`，通过 Binance USD-M Futures 当前价格和 UTC+0 当日 `1d` K 线开盘价计算 `BTCUSDT`、`ETHUSDT` 的当日涨跌额与涨跌率，返回口径标记为 `UTC+0`。
+- `/paper` 顶部新增单行紧凑状态条：
+  - 同一行显示 `BTC 永续`、`ETH 永续` 实时价格、UTC+0 当日涨跌额、UTC+0 当日涨跌率，以及转换后的 `UTC+8 YYYY-MM-DD HH:mm:ss`。
+  - 涨为绿色，跌为红色；前端每秒更新时间，每 10 秒刷新一次行情。
 - 前端每 10 秒刷新一次行情；“刷新”按钮会同时刷新 Paper 状态和行情。若 Binance 行情连接失败，会在行情条直接显示 `行情连接失败`。
 - `/paper` 顶部 H1 已按用户在浏览器中选中的标题位置改为 `币安合约交易系统`。
+
+## 2026-07-04 Paper 交易记录模块
+
+- 用户要求在 `/paper` 的 `最近平仓` 上方新增 `交易记录` 显示模块。
+- `/api/paper/status` 新增 `trade_records`，按 `paper_trades.id DESC` 返回完整模拟交易记录；原 `trades` 仍保留最近 20 条，用于 `最近平仓`。
+- 页面新增 `交易记录` 区块并放在 `最近平仓` 上方，默认容器高度约显示 5 条记录，超过部分在该模块内部滚动。
 
 ## 启动
 

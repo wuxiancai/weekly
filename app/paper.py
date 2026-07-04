@@ -424,6 +424,7 @@ class PaperEngine:
         strategies = [dict(row) for row in self.conn.execute("SELECT * FROM paper_strategies ORDER BY symbol, interval")]
         positions = [dict(row) for row in self.conn.execute("SELECT * FROM paper_positions ORDER BY symbol, interval")]
         trades = [dict(row) for row in self.conn.execute("SELECT * FROM paper_trades ORDER BY id DESC LIMIT 20")]
+        trade_records = [dict(row) for row in self.conn.execute("SELECT * FROM paper_trades ORDER BY id DESC")]
         events = [dict(row) for row in self.conn.execute("SELECT * FROM paper_events ORDER BY id DESC LIMIT 20")]
         curves = [dict(row) for row in self.conn.execute("SELECT * FROM paper_equity_curve ORDER BY open_time DESC LIMIT 50")]
         for row in strategies:
@@ -434,6 +435,7 @@ class PaperEngine:
             "account": account,
             "strategies": strategies,
             "positions": positions,
+            "trade_records": trade_records,
             "trades": trades,
             "events": events,
             "equity_curve": list(reversed(curves)),

@@ -62,6 +62,50 @@ class PaperTradingTests(unittest.TestCase):
         self.assertEqual(account["equity"], 1000.0)
         self.assertEqual(len(strategies), 6)
 
+    def test_paper_status_returns_full_trade_records_separate_from_recent_trades(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        init_paper_schema(conn)
+        engine = PaperEngine(conn)
+        engine.initialize()
+
+        for i in range(25):
+            conn.execute(
+                """
+                INSERT INTO paper_trades(
+                    symbol, interval, side, signal_time, entry_time, exit_time, entry_price,
+                    exit_price, quantity, pnl, pnl_pct, reward_risk_ratio,
+                    max_drawdown_pct, return_drawdown_ratio, exit_reason, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "BTCUSDT",
+                    "1h",
+                    "LONG",
+                    1000 + i,
+                    2000 + i,
+                    3000 + i,
+                    100.0,
+                    101.0,
+                    1.0,
+                    float(i),
+                    float(i),
+                    1.0,
+                    0.5,
+                    2.0,
+                    "TEST",
+                    4000 + i,
+                ),
+            )
+        conn.commit()
+
+        status = engine.status()
+
+        self.assertEqual(len(status["trades"]), 20)
+        self.assertEqual(len(status["trade_records"]), 25)
+        self.assertGreater(status["trade_records"][0]["id"], status["trade_records"][-1]["id"])
+
     def test_process_closed_candles_is_idempotent_for_same_candle(self) -> None:
         conn = sqlite3.connect(":memory:")
         conn.row_factory = sqlite3.Row
@@ -97,14 +141,23 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("BTC 永续", PAPER_HTML)
         self.assertIn("ETH 永续", PAPER_HTML)
         self.assertIn("UTC+8", PAPER_HTML)
+        self.assertEqual(PAPER_HTML.count('class="ticker-row"'), 1)
+        self.assertNotIn('class="clock-row"', PAPER_HTML)
 
-    def test_market_tickers_api_returns_btc_eth_futures_price_changes(self) -> None:
+    def test_paper_page_shows_scrollable_trade_records_before_recent_closed_trades(self) -> None:
+        self.assertLess(PAPER_HTML.index("<h2>交易记录</h2>"), PAPER_HTML.index("<h2>最近平仓</h2>"))
+        self.assertIn('class="trade-records-scroll"', PAPER_HTML)
+        self.assertIn('id="tradeRecords"', PAPER_HTML)
+        self.assertIn("fillTradeRecords(data.trade_records || data.trades || []);", PAPER_HTML)
+        self.assertIn("function fillTradeRecords(items)", PAPER_HTML)
+
+    def test_market_tickers_api_returns_utc_day_price_changes(self) -> None:
         class FakeClient:
-            def fetch_24hr_tickers(self, symbols: list[str]) -> list[dict]:
+            def fetch_utc_day_tickers(self, symbols: list[str]) -> list[dict]:
                 self.symbols = symbols
                 return [
-                    {"symbol": "BTCUSDT", "lastPrice": "62498.30", "priceChangePercent": "1.23", "closeTime": 1783180800000},
-                    {"symbol": "ETHUSDT", "lastPrice": "3420.10", "priceChangePercent": "-0.45", "closeTime": 1783180801000},
+                    {"symbol": "BTCUSDT", "lastPrice": "62445.50", "utcOpenPrice": "62560.50", "eventTime": 1783180800000},
+                    {"symbol": "ETHUSDT", "lastPrice": "1758.71", "utcOpenPrice": "1743.53", "eventTime": 1783180801000},
                 ]
 
         original_client = main.BinanceClient
@@ -118,11 +171,15 @@ class PaperTradingTests(unittest.TestCase):
         self.assertEqual(fake.symbols, ["BTCUSDT", "ETHUSDT"])
         self.assertEqual(data["timezone"], "UTC+0")
         self.assertEqual(data["items"][0]["symbol"], "BTCUSDT")
-        self.assertEqual(data["items"][0]["price"], 62498.3)
-        self.assertEqual(data["items"][0]["change_pct"], 1.23)
+        self.assertEqual(data["items"][0]["price"], 62445.5)
+        self.assertEqual(data["items"][0]["utc_open_price"], 62560.5)
+        self.assertEqual(data["items"][0]["change"], -115.0)
+        self.assertEqual(data["items"][0]["change_pct"], -0.1838)
         self.assertEqual(data["items"][1]["symbol"], "ETHUSDT")
-        self.assertEqual(data["items"][1]["price"], 3420.1)
-        self.assertEqual(data["items"][1]["change_pct"], -0.45)
+        self.assertEqual(data["items"][1]["price"], 1758.71)
+        self.assertEqual(data["items"][1]["utc_open_price"], 1743.53)
+        self.assertEqual(data["items"][1]["change"], 15.18)
+        self.assertEqual(data["items"][1]["change_pct"], 0.8706)
 
 
 def _sample_4h_candles(count: int) -> list[dict]:
