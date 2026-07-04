@@ -11,6 +11,7 @@ class DeployScriptTests(unittest.TestCase):
 
         self.assertIn("weekly-web", script)
         self.assertIn("0.0.0.0", script)
+        self.assertIn('PORT="${PORT:-8001}"', script)
         self.assertIn("python3-venv", script)
         self.assertIn("systemctl enable", script)
         self.assertIn("ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh", script)
@@ -26,6 +27,15 @@ class DeployScriptTests(unittest.TestCase):
         self.assertIn("app.paper_runner", script)
         self.assertIn("uvicorn app.main:app", script)
         self.assertIn("PAPER_POLL_SECONDS", script)
+        self.assertIn('REQUESTED_PORT="${PORT:-8001}"', script)
+        self.assertIn("resolve_web_port", script)
+        self.assertIn("端口 ${port} 被本项目进程占用", script)
+        self.assertIn("端口 ${port} 被其他应用占用", script)
+
+    def test_legacy_systemd_installer_defaults_to_port_8001(self) -> None:
+        script = (ROOT / "scripts" / "install_systemd_service.sh").read_text()
+
+        self.assertIn('PORT="${PORT:-8001}"', script)
 
     def test_paper_runner_script_uses_project_venv(self) -> None:
         script = (ROOT / "scripts" / "run_paper.sh").read_text()

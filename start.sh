@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 OS_NAME="$(uname -s)"
 HOST="${HOST:-0.0.0.0}"
-REQUESTED_PORT="${PORT:-8000}"
+REQUESTED_PORT="${PORT:-8001}"
 PAPER_POLL_SECONDS="${PAPER_POLL_SECONDS:-60}"
 
 if command -v python3 >/dev/null 2>&1; then
@@ -87,20 +87,94 @@ stop_existing_project_processes() {
 
 stop_existing_project_processes
 
-PORT="$("$VENV_PYTHON" - "$REQUESTED_PORT" <<'PY'
-import socket
-import sys
+port_pids() {
+  local port="$1"
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true
+    return
+  fi
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnp "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | sort -u
+  fi
+}
 
-start = int(sys.argv[1])
-for port in range(start, start + 50):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(0.2)
-        if sock.connect_ex(("127.0.0.1", port)) != 0:
-            print(port)
-            raise SystemExit(0)
-raise SystemExit(f"No available port from {start} to {start + 49}")
-PY
-)"
+is_project_pid() {
+  local pid="$1"
+  local command_line
+  local cwd
+  command_line="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+  cwd=""
+  if [ -r "/proc/${pid}/cwd" ]; then
+    cwd="$(readlink "/proc/${pid}/cwd" 2>/dev/null || true)"
+  elif command -v lsof >/dev/null 2>&1; then
+    cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
+  fi
+  if [ "$cwd" = "$ROOT_DIR" ]; then
+    case "$command_line" in
+      *"uvicorn app.main:app"*|*"app.paper_runner"*|*"start.sh"*)
+        return 0
+        ;;
+    esac
+  fi
+  case "$command_line" in
+    *"$ROOT_DIR/.venv/"*|*"$ROOT_DIR/start.sh"*|*"$ROOT_DIR/scripts/start.sh"*|*"WorkingDirectory=${ROOT_DIR}"*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+terminate_pids() {
+  local pids=("$@")
+  [ "${#pids[@]}" -gt 0 ] || return 0
+  kill "${pids[@]}" 2>/dev/null || true
+  sleep 2
+  local pid
+  for pid in "${pids[@]}"; do
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+  done
+}
+
+resolve_web_port() {
+  local start="$1"
+  local port
+  local pid
+  for ((port = start; port < start + 50; port++)); do
+    local pids=()
+    while IFS= read -r pid; do
+      [ -n "$pid" ] || continue
+      pids+=("$pid")
+    done < <(port_pids "$port")
+
+    if [ "${#pids[@]}" -eq 0 ]; then
+      echo "$port"
+      return 0
+    fi
+
+    local all_project=1
+    for pid in "${pids[@]}"; do
+      if ! is_project_pid "$pid"; then
+        all_project=0
+        break
+      fi
+    done
+
+    if [ "$all_project" -eq 1 ]; then
+      echo "端口 ${port} 被本项目进程占用，先停止后复用: ${pids[*]}" >&2
+      terminate_pids "${pids[@]}"
+      echo "$port"
+      return 0
+    fi
+
+    echo "端口 ${port} 被其他应用占用，顺延检查下一个端口。" >&2
+  done
+  echo "No available port from ${start} to $((start + 49))" >&2
+  return 1
+}
+
+PORT="$(resolve_web_port "$REQUESTED_PORT")"
 
 echo "系统: ${PLATFORM}"
 echo "监听: http://127.0.0.1:${PORT} 以及 http://0.0.0.0:${PORT}"
