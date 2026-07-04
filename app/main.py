@@ -760,7 +760,7 @@ PAPER_HTML = """
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>模拟交易状态</title>
   <style>
-    :root { color-scheme: dark; --bg:#101216; --panel:#171b22; --line:#2a303a; --text:#e8edf5; --muted:#8d97a8; --green:#25c486; --red:#ff5266; --blue:#66b7ff; }
+    :root { color-scheme: dark; --bg:#101216; --panel:#171b22; --line:#2a303a; --text:#e8edf5; --muted:#8d97a8; --green:#25c486; --red:#ff5266; --blue:#66b7ff; --purple:#b58cff; --yellow:#ffd166; }
     * { box-sizing: border-box; }
     body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); }
     header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); background:#0c0e12; }
@@ -788,6 +788,10 @@ PAPER_HTML = """
     .muted { color:var(--muted); }
     .pos { color:var(--green); }
     .neg { color:var(--red); }
+    .symbol-btc, .interval-1w { color:var(--blue); font-weight:700; }
+    .interval-1d { color:var(--red); font-weight:700; }
+    .interval-4h { color:var(--purple); font-weight:700; }
+    .interval-1h { color:var(--yellow); font-weight:700; }
     @media (max-width: 900px) { .grid { grid-template-columns:repeat(2,1fr); } header { align-items:stretch; flex-direction:column; gap:12px; } .market-ticker { min-width:0; max-width:none; width:100%; padding:8px 10px; } .ticker-row { justify-content:flex-start; gap:9px; overflow:auto; } .ticker-item { gap:4px; } .ticker-label, .clock-label { font-size:11px; } .ticker-price { font-size:14px; } .ticker-change, .clock-value { font-size:12px; } }
   </style>
 </head>
@@ -816,7 +820,7 @@ PAPER_HTML = """
     </section>
     <section class="panel">
       <h2>当前持仓</h2>
-      <table><thead><tr><th>交易对</th><th>周期</th><th>方向</th><th>入场时间</th><th>入场价</th><th>数量</th><th>止损</th><th>保护/止盈</th></tr></thead><tbody id="positions"></tbody></table>
+      <table><thead><tr><th>交易对</th><th>周期</th><th>方向</th><th>入场时间</th><th>入场价</th><th>数量</th><th>金额(USDT)</th><th>止损</th><th>保护/止盈</th></tr></thead><tbody id="positions"></tbody></table>
     </section>
     <section class="panel">
       <h2>策略状态</h2>
@@ -825,12 +829,12 @@ PAPER_HTML = """
     <section class="panel">
       <h2>交易记录</h2>
       <div class="trade-records-scroll">
-        <table><thead><tr><th>交易对</th><th>方向</th><th>入场</th><th>出场</th><th>入场价</th><th>出场价</th><th>收益(USDT)</th><th>收益率</th><th>原因</th></tr></thead><tbody id="tradeRecords"></tbody></table>
+        <table><thead><tr><th>交易对</th><th>周期</th><th>方向</th><th>入场</th><th>出场</th><th>入场价</th><th>出场价</th><th>收益(USDT)</th><th>收益率</th><th>原因</th></tr></thead><tbody id="tradeRecords"></tbody></table>
       </div>
     </section>
     <section class="panel">
       <h2>最近平仓</h2>
-      <table><thead><tr><th>交易对</th><th>方向</th><th>入场</th><th>出场</th><th>入场价</th><th>出场价</th><th>收益(USDT)</th><th>收益率</th><th>原因</th></tr></thead><tbody id="trades"></tbody></table>
+      <table><thead><tr><th>交易对</th><th>周期</th><th>方向</th><th>入场</th><th>出场</th><th>入场价</th><th>出场价</th><th>收益(USDT)</th><th>收益率</th><th>原因</th></tr></thead><tbody id="trades"></tbody></table>
     </section>
     <section class="panel">
       <h2>运行日志</h2>
@@ -942,7 +946,38 @@ function updateUtc8Clock() {
   const text = `${utc8.getFullYear()}-${pad(utc8.getMonth() + 1)}-${pad(utc8.getDate())} ${pad(utc8.getHours())}:${pad(utc8.getMinutes())}:${pad(utc8.getSeconds())}`;
   document.getElementById('utc8Clock').textContent = text;
 }
-function date(ms) { return ms ? new Date(Number(ms)).toLocaleString() : '-'; }
+function formatDateTime(ms) {
+  const value = Number(ms);
+  if (!Number.isFinite(value) || value <= 0) return '-';
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return '-';
+  const pad = item => String(item).padStart(2, '0');
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+}
+function date(ms) { return formatDateTime(ms); }
+function symbolClass(value) { return String(value || '').toUpperCase() === 'BTCUSDT' ? 'symbol-btc' : ''; }
+function intervalClass(value) {
+  const normalized = String(value || '').toLowerCase();
+  return ['1w', '1d', '4h', '1h'].includes(normalized) ? `interval-${normalized}` : '';
+}
+function symbolCell(value) { return `<span class="${symbolClass(value)}">${value || '-'}</span>`; }
+function intervalCell(value) { return `<span class="${intervalClass(value)}">${value || '-'}</span>`; }
+function formatAmount(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount.toFixed(2) : '-';
+}
+function formatPayload(payload) {
+  const source = typeof payload === 'string' ? safeJsonParse(payload) : payload;
+  if (!source || typeof source !== 'object') return JSON.stringify(payload || {});
+  const normalized = {};
+  for (const [key, value] of Object.entries(source)) {
+    normalized[key] = key.endsWith('_time') || key === 'event_time' ? formatDateTime(value) : value;
+  }
+  return JSON.stringify(normalized);
+}
+function safeJsonParse(value) {
+  try { return JSON.parse(value); } catch (_) { return value; }
+}
 function updateStrategyIntervals(strategies) {
   const intervalOrder = ['1w', '1d', '4h', '1h'];
   const active = new Set(strategies.filter(s => s.enabled).map(s => s.interval));
@@ -951,26 +986,26 @@ function updateStrategyIntervals(strategies) {
 }
 function fillStrategies(items) {
   document.getElementById('strategies').innerHTML = items.map(s => `
-    <tr><td>${s.symbol}</td><td>${s.interval}</td><td>${s.enabled ? 'YES' : 'NO'}</td><td>${date(s.last_processed_open_time)}</td><td class="muted">${summary(s.params)}</td></tr>
+    <tr><td>${symbolCell(s.symbol)}</td><td>${intervalCell(s.interval)}</td><td>${s.enabled ? 'YES' : 'NO'}</td><td>${date(s.last_processed_open_time)}</td><td class="muted">${summary(s.params)}</td></tr>
   `).join('');
 }
 function fillPositions(items) {
   document.getElementById('positions').innerHTML = items.map(p => `
-    <tr><td>${p.symbol}</td><td>${p.interval}</td><td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${date(p.entry_time)}</td><td>${Number(p.entry_price).toFixed(2)}</td><td>${Number(p.quantity).toFixed(6)}</td><td>${Number(p.stop_price).toFixed(2)}</td><td>${Number(p.take_price).toFixed(2)}</td></tr>
-  `).join('') || '<tr><td colspan="8" class="muted">暂无持仓</td></tr>';
+    <tr><td>${symbolCell(p.symbol)}</td><td>${intervalCell(p.interval)}</td><td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${date(p.entry_time)}</td><td>${Number(p.entry_price).toFixed(2)}</td><td>${Number(p.quantity).toFixed(6)}</td><td>${formatAmount(p.entry_margin)}</td><td>${Number(p.stop_price).toFixed(2)}</td><td>${Number(p.take_price).toFixed(2)}</td></tr>
+  `).join('') || '<tr><td colspan="9" class="muted">暂无持仓</td></tr>';
 }
 function tradeRow(t) {
-  return `<tr><td>${t.symbol}</td><td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td><td>${date(t.entry_time)}</td><td>${date(t.exit_time)}</td><td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td><td>${Number(t.pnl_pct).toFixed(2)}%</td><td>${t.exit_reason}</td></tr>`;
+  return `<tr><td>${symbolCell(t.symbol)}</td><td>${intervalCell(t.interval)}</td><td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td><td>${date(t.entry_time)}</td><td>${date(t.exit_time)}</td><td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td><td>${Number(t.pnl_pct).toFixed(2)}%</td><td>${t.exit_reason}</td></tr>`;
 }
 function fillTradeRecords(items) {
-  document.getElementById('tradeRecords').innerHTML = items.map(tradeRow).join('') || '<tr><td colspan="9" class="muted">暂无交易记录</td></tr>';
+  document.getElementById('tradeRecords').innerHTML = items.map(tradeRow).join('') || '<tr><td colspan="10" class="muted">暂无交易记录</td></tr>';
 }
 function fillTrades(items) {
-  document.getElementById('trades').innerHTML = items.map(tradeRow).join('') || '<tr><td colspan="9" class="muted">暂无平仓记录</td></tr>';
+  document.getElementById('trades').innerHTML = items.map(tradeRow).join('') || '<tr><td colspan="10" class="muted">暂无平仓记录</td></tr>';
 }
 function fillEvents(items) {
   document.getElementById('events').innerHTML = items.map(e => `
-    <tr><td>${date(e.event_time)}</td><td>${e.symbol} ${e.interval}</td><td>${e.event_type}</td><td class="muted">${JSON.stringify(e.payload)}</td></tr>
+    <tr><td>${date(e.event_time)}</td><td>${symbolCell(e.symbol)} ${intervalCell(e.interval)}</td><td>${e.event_type}</td><td class="muted">${formatPayload(e.payload)}</td></tr>
   `).join('') || '<tr><td colspan="4" class="muted">暂无运行日志</td></tr>';
 }
 function summary(p) {
