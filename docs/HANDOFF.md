@@ -578,7 +578,7 @@ http://127.0.0.1:8001
 - 用户指出：终端执行 `start.sh` 后不能关闭终端肯定不行；同时再次强调 `start.sh` 必须启动一切。
 - 根因：此前 `start.sh` 只有前台 supervisor 行为，适合 systemd 托管，但不适合 SSH 手动执行后关闭终端。
 - 修改：
-  - `./start.sh` 默认后台启动同一个 supervisor，写入 `runtime/start.pid`，日志写入 `runtime/logs/start.log`，终端可以关闭。
+  - `./start.sh` 在 Ubuntu/systemd 环境默认安装/更新并重启 `weekly-web`，该服务执行 `./start.sh --foreground`；非 systemd 环境才用 `nohup` 后台启动同一个 supervisor，写入 `runtime/start.pid`，日志写入 `runtime/logs/start.log`。
   - `./start.sh --foreground` 前台启动同一个 supervisor，供 systemd 托管。
   - `scripts/deploy_one_click.sh` 的 systemd `ExecStart` 已改为 `/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground`。
   - Web 和 Paper runner 仍由根目录 `start.sh` 统一启动、监控和清理，没有恢复独立 `weekly-paper` 服务。
@@ -599,6 +599,36 @@ sudo systemctl restart weekly-web
 ```bash
 kill $(cat runtime/start.pid)
 ```
+
+## 2026-07-04 start.sh 处理旧 systemd 双轨部署
+
+- 用户贴出的服务器日志显示：
+  - 手动执行 `bash scripts/start.sh` 启动的是旧前台 Web 进程，监听 `8002`，输出 `停止: Ctrl+C`。
+  - `Ctrl+C` 后 `8002` 不再监听。
+  - 但 `systemctl status weekly-web` 仍 active，因为旧 `weekly-web` 服务直接运行 `uvicorn app.main:app` 并监听 `8001`。
+  - `weekly-paper` 旧独立服务仍 active。
+- 根因：服务器还处在旧部署形态，存在三条启动路径：
+  - 手动前台 `scripts/start.sh` 临时进程。
+  - 旧 `weekly-web` 直接 `uvicorn`。
+  - 旧 `weekly-paper` 直接 `app.paper_runner`。
+- 修改：
+  - 根目录 `start.sh` 默认模式在 systemd 环境下不再起临时 `8002` 进程，而是写入/更新 `weekly-web.service`，`ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground`，然后 `systemctl restart weekly-web`。
+  - 根目录 `start.sh` 会停止、禁用并删除旧 `weekly-paper.service`。
+  - `scripts/deploy_one_click.sh` 复用根目录 `start.sh` 做 systemd 安装和重启，避免两套 unit 写法漂移。
+  - 非 systemd 环境保留 `nohup "$0" --foreground` fallback。
+- 服务器更新到此版本后，执行：
+
+```bash
+bash scripts/start.sh
+```
+
+或：
+
+```bash
+./start.sh
+```
+
+应直接更新并重启 `weekly-web`，不应再出现一个会被 `Ctrl+C` 停掉的临时 `8002` 前台进程。
 
 ## 下一步建议
 

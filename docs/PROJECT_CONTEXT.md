@@ -39,7 +39,7 @@
 - 已新增实盘模拟 / Paper Trading 运行态：默认一个共享 `1000 USDT` 模拟账户，同时运行 `BTCUSDT / 1w`、`BTCUSDT / 1d`、`BTCUSDT / 4h`、`BTCUSDT / 1h`、`ETHUSDT / 1w`、`ETHUSDT / 1d`、`ETHUSDT / 4h`、`ETHUSDT / 1h` 独立策略；只使用 Binance USDⓈ-M Futures 行情，不提交真实订单。
 - 模拟交易后台使用 REST 轮询已收盘 K 线，首次启动只预热指标并定位最新已收盘 K 线，避免把历史信号误当成实时成交；后续每根 K 线只处理一次，状态写入 SQLite。
 - Web 新增 `/paper` 状态页，展示模拟账户资金、当前持仓、策略处理进度、最近平仓和运行日志。
-- 根目录 `./start.sh` 是统一运行入口：先停止本项目旧 Web/Paper 进程，再启动 FastAPI 回测系统和 Paper runner；手动执行默认后台运行并写入 `runtime/start.pid` 与 `runtime/logs/start.log`，终端可关闭；云服务器 systemd 服务调用 `./start.sh --foreground` 托管同一套启动逻辑。
+- 根目录 `./start.sh` 是统一运行入口：先停止本项目旧 Web/Paper 进程，再启动 FastAPI 回测系统和 Paper runner；在 Ubuntu/systemd 环境手动执行会安装/更新并重启 `weekly-web`，该服务调用 `./start.sh --foreground` 托管同一套启动逻辑；非 systemd 环境才用 `nohup` 后台运行并写入 `runtime/start.pid` 与 `runtime/logs/start.log`。
 - Web 默认端口为 `8001`；如果端口被本项目进程占用，`start.sh` 会先终止旧进程并复用该端口；如果被其他应用占用，则自动顺延到下一个可用端口。
 - Paper runner 会按策略指标周期自动计算预热 K 线数量，环境变量 `PAPER_WARMUP_CANDLES` 与策略需求取较大值，且不少于 60 根 K 线。
 

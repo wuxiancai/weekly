@@ -5,6 +5,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
 START_MODE="${START_MODE:-daemon}"
+WEB_SERVICE="${WEB_SERVICE:-weekly-web}"
+LEGACY_PAPER_SERVICE="${LEGACY_PAPER_SERVICE:-weekly-paper}"
+SERVICE_USER="${SERVICE_USER:-$(whoami)}"
+HOST="${HOST:-0.0.0.0}"
+REQUESTED_PORT="${PORT:-8001}"
+PAPER_POLL_SECONDS="${PAPER_POLL_SECONDS:-60}"
 PASSTHROUGH_ARGS=()
 for arg in "$@"; do
   case "$arg" in
@@ -16,7 +22,7 @@ for arg in "$@"; do
       ;;
     --help|-h)
       echo "用法: ./start.sh [--daemon|--foreground]"
-      echo "  --daemon      后台启动 Web 和 Paper，终端可关闭。默认行为。"
+      echo "  --daemon      默认行为。systemd 环境安装/重启 weekly-web；非 systemd 环境用 nohup 后台启动。"
       echo "  --foreground  前台启动 Web 和 Paper，供 systemd 托管。"
       exit 0
       ;;
@@ -28,7 +34,57 @@ done
 
 mkdir -p runtime/logs
 
+has_systemd() {
+  command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]
+}
+
+install_or_restart_systemd_service() {
+  if ! command -v sudo >/dev/null 2>&1; then
+    return 1
+  fi
+
+  sudo tee "/etc/systemd/system/${WEB_SERVICE}.service" >/dev/null <<SERVICE
+[Unit]
+Description=Weekly BTCUSDT/ETHUSDT web backtest and paper runner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=${SERVICE_USER}
+WorkingDirectory=${ROOT_DIR}
+Environment=HOST=${HOST}
+Environment=PORT=${REQUESTED_PORT}
+Environment=PAPER_POLL_SECONDS=${PAPER_POLL_SECONDS}
+ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+  if systemctl list-unit-files "${LEGACY_PAPER_SERVICE}.service" >/dev/null 2>&1; then
+    sudo systemctl stop "${LEGACY_PAPER_SERVICE}.service" 2>/dev/null || true
+    sudo systemctl disable "${LEGACY_PAPER_SERVICE}.service" 2>/dev/null || true
+  fi
+  if [ -f "/etc/systemd/system/${LEGACY_PAPER_SERVICE}.service" ]; then
+    sudo rm -f "/etc/systemd/system/${LEGACY_PAPER_SERVICE}.service"
+  fi
+
+  sudo systemctl daemon-reload
+  sudo systemctl enable "${WEB_SERVICE}.service" >/dev/null
+  sudo systemctl restart "${WEB_SERVICE}.service"
+  echo "start.sh 已交给 systemd 托管: ${WEB_SERVICE}.service"
+  echo "查看状态: sudo systemctl status ${WEB_SERVICE}"
+  echo "查看日志: sudo journalctl -u ${WEB_SERVICE} -f"
+}
+
 if [ "$START_MODE" = "daemon" ]; then
+  if [ "${START_USE_SYSTEMD:-1}" = "1" ] && has_systemd; then
+    install_or_restart_systemd_service
+    exit 0
+  fi
   nohup "$0" --foreground "${PASSTHROUGH_ARGS[@]}" >> runtime/logs/start.log 2>&1 &
   SUPERVISOR_PID="$!"
   echo "$SUPERVISOR_PID" > runtime/start.pid
@@ -41,9 +97,6 @@ fi
 echo "$$" > runtime/start.pid
 
 OS_NAME="$(uname -s)"
-HOST="${HOST:-0.0.0.0}"
-REQUESTED_PORT="${PORT:-8001}"
-PAPER_POLL_SECONDS="${PAPER_POLL_SECONDS:-60}"
 
 if command -v python3 >/dev/null 2>&1; then
   PYTHON_BIN="${PYTHON_BIN:-python3}"

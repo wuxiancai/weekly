@@ -44,38 +44,13 @@ fi
 
 chmod +x "$ROOT_DIR/start.sh" "$ROOT_DIR/scripts/start.sh" "$ROOT_DIR/scripts/run_paper.sh"
 
-sudo tee "/etc/systemd/system/${WEB_SERVICE}.service" >/dev/null <<SERVICE
-[Unit]
-Description=Weekly BTCUSDT/ETHUSDT web backtest and paper runner
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=${SERVICE_USER}
-WorkingDirectory=${ROOT_DIR}
-Environment=HOST=${HOST}
-Environment=PORT=${PORT}
-Environment=PAPER_POLL_SECONDS=${PAPER_POLL_SECONDS}
-ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
-
-if systemctl list-unit-files "${LEGACY_PAPER_SERVICE}.service" >/dev/null 2>&1; then
-  sudo systemctl stop "${LEGACY_PAPER_SERVICE}.service" 2>/dev/null || true
-  sudo systemctl disable "${LEGACY_PAPER_SERVICE}.service" 2>/dev/null || true
-fi
-if [ -f "/etc/systemd/system/${LEGACY_PAPER_SERVICE}.service" ]; then
-  sudo rm -f "/etc/systemd/system/${LEGACY_PAPER_SERVICE}.service"
-fi
-
-sudo systemctl daemon-reload
-sudo systemctl enable "${WEB_SERVICE}.service"
-sudo systemctl restart "${WEB_SERVICE}.service"
+WEB_SERVICE="$WEB_SERVICE" \
+LEGACY_PAPER_SERVICE="$LEGACY_PAPER_SERVICE" \
+SERVICE_USER="$SERVICE_USER" \
+HOST="$HOST" \
+PORT="$PORT" \
+PAPER_POLL_SECONDS="$PAPER_POLL_SECONDS" \
+"$ROOT_DIR/start.sh"
 
 echo "部署完成"
 echo "Web: http://服务器IP:${PORT}"
