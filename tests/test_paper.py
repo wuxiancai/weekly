@@ -143,6 +143,12 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("UTC+8", PAPER_HTML)
         self.assertEqual(PAPER_HTML.count('class="ticker-row"'), 1)
         self.assertNotIn('class="clock-row"', PAPER_HTML)
+        self.assertIn("openMarketTickerStream()", PAPER_HTML)
+        self.assertIn("wss://fstream.binance.com/stream?streams=btcusdt@bookTicker/ethusdt@bookTicker", PAPER_HTML)
+        self.assertIn("dataset.streamState = 'open';", PAPER_HTML)
+        self.assertIn("dataset.streamUpdates", PAPER_HTML)
+        self.assertIn("setInterval(loadMarketTicker, 60000);", PAPER_HTML)
+        self.assertNotIn("setInterval(loadMarketTicker, 10000);", PAPER_HTML)
 
     def test_paper_page_shows_scrollable_trade_records_before_recent_closed_trades(self) -> None:
         self.assertLess(PAPER_HTML.index("<h2>交易记录</h2>"), PAPER_HTML.index("<h2>最近平仓</h2>"))

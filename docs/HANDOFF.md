@@ -506,8 +506,12 @@
 - 新增 `/api/market/tickers`，通过 Binance USD-M Futures 当前价格和 UTC+0 当日 `1d` K 线开盘价计算 `BTCUSDT`、`ETHUSDT` 的当日涨跌额与涨跌率，返回口径标记为 `UTC+0`。
 - `/paper` 顶部新增单行紧凑状态条：
   - 同一行显示 `BTC 永续`、`ETH 永续` 实时价格、UTC+0 当日涨跌额、UTC+0 当日涨跌率，以及转换后的 `UTC+8 YYYY-MM-DD HH:mm:ss`。
-  - 涨为绿色，跌为红色；前端每秒更新时间，每 10 秒刷新一次行情。
-- 前端每 10 秒刷新一次行情；“刷新”按钮会同时刷新 Paper 状态和行情。若 Binance 行情连接失败，会在行情条直接显示 `行情连接失败`。
+  - 涨为绿色，跌为红色；前端每秒更新时间。
+- 行情刷新已改为实时推送：
+  - 页面先通过 `/api/market/tickers` 初始化 UTC+0 当日开盘价和当前价。
+  - 然后连接 Binance Futures WebSocket `btcusdt@bookTicker/ethusdt@bookTicker`，用买一卖一中间价实时更新 BTC/ETH 永续价格，并按 UTC+0 当日开盘价即时重算涨跌额和涨跌率。
+  - REST 行情接口保留为 60 秒一次的 UTC+0 基准价刷新与兜底，不再使用 10 秒轮询作为主行情源。
+  - WebSocket 断开后 3 秒自动重连；“刷新”按钮会同时刷新 Paper 状态和 REST 行情基准。若 Binance 行情连接失败，会在行情条直接显示 `行情连接失败`。
 - `/paper` 顶部 H1 已按用户在浏览器中选中的标题位置改为 `币安合约交易系统`。
 
 ## 2026-07-04 Paper 交易记录模块

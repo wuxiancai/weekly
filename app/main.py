@@ -806,6 +806,10 @@ PAPER_HTML = """
     </section>
   </main>
 <script>
+let marketTickerSocket = null;
+let marketTickerReconnectTimer = null;
+const marketTickerState = {};
+
 async function loadStatus() {
   const res = await fetch('/api/paper/status');
   const data = await res.json();
@@ -821,20 +825,69 @@ async function loadStatus() {
 }
 function loadAll() {
   loadStatus();
-  loadMarketTicker();
+  return loadMarketTicker();
 }
 async function loadMarketTicker() {
   try {
     const res = await fetch('/api/market/tickers');
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || '行情连接失败');
-    const bySymbol = Object.fromEntries((data.items || []).map(item => [item.symbol, item]));
+    const bySymbol = Object.fromEntries((data.items || []).map(item => {
+      marketTickerState[item.symbol] = item;
+      return [item.symbol, item];
+    }));
     fillTicker('tickerBtc', bySymbol.BTCUSDT);
     fillTicker('tickerEth', bySymbol.ETHUSDT);
   } catch (error) {
     document.getElementById('tickerBtc').innerHTML = '<span class="ticker-label">BTC 永续</span><span class="ticker-change neg">行情连接失败</span>';
     document.getElementById('tickerEth').innerHTML = '<span class="ticker-label">ETH 永续</span><span class="ticker-change neg">行情连接失败</span>';
   }
+}
+function openMarketTickerStream() {
+  if (marketTickerSocket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(marketTickerSocket.readyState)) return;
+  if (marketTickerReconnectTimer) {
+    clearTimeout(marketTickerReconnectTimer);
+    marketTickerReconnectTimer = null;
+  }
+  const tickerEl = document.getElementById('marketTicker');
+  tickerEl.dataset.streamState = 'connecting';
+  marketTickerSocket = new WebSocket('wss://fstream.binance.com/stream?streams=btcusdt@bookTicker/ethusdt@bookTicker');
+  window.marketTickerSocket = marketTickerSocket;
+  marketTickerSocket.onopen = () => {
+    tickerEl.dataset.streamState = 'open';
+  };
+  marketTickerSocket.onmessage = event => {
+    const payload = JSON.parse(event.data);
+    const ticker = payload.data || payload;
+    const symbol = ticker.s;
+    if (!symbol) return;
+    const bid = Number(ticker.b);
+    const ask = Number(ticker.a);
+    const price = Number.isFinite(bid) && Number.isFinite(ask) ? (bid + ask) / 2 : Number(ticker.p || ticker.c);
+    if (!Number.isFinite(price)) return;
+    const previous = marketTickerState[symbol] || { symbol };
+    const utcOpen = Number(previous.utc_open_price || 0);
+    const change = price - utcOpen;
+    const item = {
+      ...previous,
+      symbol,
+      price,
+      change,
+      change_pct: utcOpen ? change / utcOpen * 100 : 0,
+      event_time: Number(ticker.E || Date.now()),
+    };
+    marketTickerState[symbol] = item;
+    tickerEl.dataset.streamUpdates = String(Number(tickerEl.dataset.streamUpdates || 0) + 1);
+    fillTicker(symbol === 'BTCUSDT' ? 'tickerBtc' : 'tickerEth', item);
+  };
+  marketTickerSocket.onclose = () => {
+    tickerEl.dataset.streamState = 'closed';
+    marketTickerReconnectTimer = setTimeout(openMarketTickerStream, 3000);
+  };
+  marketTickerSocket.onerror = () => {
+    tickerEl.dataset.streamState = 'error';
+    marketTickerSocket.close();
+  };
 }
 function fillTicker(id, item) {
   const el = document.getElementById(id);
@@ -885,10 +938,10 @@ function summary(p) {
   return `EMA${p.ema_period}/MA${p.ma_period}, ADX${p.adx_min}, RSI ${p.long_rsi_min}-${p.long_rsi_max}, SL${p.stop_atr}, TP${p.take_atr}, Step${p.take_atr_step}, Max${p.take_atr_max}, Regime ${p.regime_switch ? 'YES' : 'NO'}`;
 }
 document.addEventListener('DOMContentLoaded', () => {
-  loadAll();
+  loadAll().finally(() => openMarketTickerStream());
   updateUtc8Clock();
   setInterval(updateUtc8Clock, 1000);
-  setInterval(loadMarketTicker, 10000);
+  setInterval(loadMarketTicker, 60000);
 });
 </script>
 </body>
