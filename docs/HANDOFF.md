@@ -619,16 +619,29 @@ kill $(cat runtime/start.pid)
 - 服务器更新到此版本后，执行：
 
 ```bash
-bash scripts/start.sh
-```
-
-或：
-
-```bash
 ./start.sh
 ```
 
-应直接更新并重启 `weekly-web`，不应再出现一个会被 `Ctrl+C` 停掉的临时 `8002` 前台进程。
+- 诊断当前 Web 进程实际运行版本：
+
+```bash
+curl -s http://127.0.0.1:8001/api/system/runtime
+```
+
+- 如果返回里 `paper_html_markers.hardcoded_old_intervals=true`，或页面标题仍是旧 `BTCUSDT / ETHUSDT U本位永续合约模拟交易`，说明当前浏览器访问的 Web 进程不是最新代码。
+
+## 2026-07-04 删除 scripts/start.sh 并增加运行态版本诊断
+
+- 用户已删除 `scripts/start.sh`，要求默认只使用项目根目录 `start.sh`。
+- 仓库同步该决定：
+  - 删除 `scripts/start.sh`。
+  - `scripts/deploy_one_click.sh` 不再 chmod 或引用 `scripts/start.sh`。
+  - 测试新增约束：`scripts/start.sh` 不应存在。
+- 新增 `/api/system/runtime`：
+  - 返回 `pid`、`cwd`、`app_version`、`git_commit`、`start_mode`。
+  - 返回 Paper HTML 标记：是否使用动态策略周期、是否使用新标题、是否仍含旧硬编码周期。
+- `start.sh` 会把当前 `git rev-parse --short HEAD` 写入 `APP_VERSION`，systemd unit 也会带上该环境变量。
+- 用途：以后出现“端口有监听但页面还是旧”的情况，先查 `/api/system/runtime`，确认服务实际运行 commit 和页面标记。
 
 ## 下一步建议
 

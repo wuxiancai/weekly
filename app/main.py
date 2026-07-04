@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import subprocess
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
@@ -100,6 +102,36 @@ def market_tickers() -> dict[str, Any]:
             }
         )
     return {"timezone": "UTC+0", "items": items}
+
+
+@app.get("/api/system/runtime")
+def system_runtime() -> dict[str, Any]:
+    git_commit = os.getenv("APP_VERSION") or _git_commit()
+    return {
+        "pid": os.getpid(),
+        "cwd": os.getcwd(),
+        "app_version": git_commit,
+        "git_commit": git_commit,
+        "start_mode": os.getenv("START_MODE", ""),
+        "paper_html_markers": {
+            "dynamic_strategy_intervals": 'id="strategyIntervals"' in PAPER_HTML,
+            "new_title": "<h1>币安合约交易系统</h1>" in PAPER_HTML,
+            "hardcoded_old_intervals": "<strong>1d / 4h</strong>" in PAPER_HTML
+            or "<strong>1d / 4h / 1h</strong>" in PAPER_HTML,
+        },
+    }
+
+
+def _git_commit() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=os.getcwd(),
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        return "unknown"
 
 
 @app.post("/api/sync")

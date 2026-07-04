@@ -16,8 +16,12 @@ class DeployScriptTests(unittest.TestCase):
         self.assertIn('"$ROOT_DIR/start.sh"', script)
         self.assertIn('WEB_SERVICE="$WEB_SERVICE"', script)
         self.assertIn("LEGACY_PAPER_SERVICE", script)
+        self.assertNotIn("scripts/start.sh", script)
         self.assertNotIn("ExecStart=/usr/bin/env bash ${ROOT_DIR}/scripts/run_paper.sh", script)
         self.assertNotIn('systemctl enable "${WEB_SERVICE}.service" "${PAPER_SERVICE}.service"', script)
+
+    def test_scripts_start_sh_is_removed_to_keep_single_start_entrypoint(self) -> None:
+        self.assertFalse((ROOT / "scripts" / "start.sh").exists())
 
     def test_root_start_script_launches_web_and_paper_and_stops_existing_processes(self) -> None:
         script = (ROOT / "start.sh").read_text()

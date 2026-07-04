@@ -171,6 +171,17 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("intervalOrder = ['1w', '1d', '4h', '1h'];", PAPER_HTML)
         self.assertNotIn("<strong>1d / 4h / 1h</strong>", PAPER_HTML)
 
+    def test_runtime_api_exposes_commit_and_paper_page_markers(self) -> None:
+        data = main.system_runtime()
+
+        self.assertIn("pid", data)
+        self.assertIn("cwd", data)
+        self.assertIn("app_version", data)
+        self.assertIn("git_commit", data)
+        self.assertTrue(data["paper_html_markers"]["dynamic_strategy_intervals"])
+        self.assertTrue(data["paper_html_markers"]["new_title"])
+        self.assertFalse(data["paper_html_markers"]["hardcoded_old_intervals"])
+
     def test_market_tickers_api_returns_utc_day_price_changes(self) -> None:
         class FakeClient:
             def fetch_utc_day_tickers(self, symbols: list[str]) -> list[dict]:

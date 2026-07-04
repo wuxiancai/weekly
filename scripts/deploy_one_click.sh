@@ -42,7 +42,7 @@ fi
 "$VENV_PYTHON" -m pip install --upgrade pip
 "$VENV_PYTHON" -m pip install -r requirements.txt
 
-chmod +x "$ROOT_DIR/start.sh" "$ROOT_DIR/scripts/start.sh" "$ROOT_DIR/scripts/run_paper.sh"
+chmod +x "$ROOT_DIR/start.sh" "$ROOT_DIR/scripts/run_paper.sh"
 
 WEB_SERVICE="$WEB_SERVICE" \
 LEGACY_PAPER_SERVICE="$LEGACY_PAPER_SERVICE" \

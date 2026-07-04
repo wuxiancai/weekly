@@ -11,6 +11,10 @@ SERVICE_USER="${SERVICE_USER:-$(whoami)}"
 HOST="${HOST:-0.0.0.0}"
 REQUESTED_PORT="${PORT:-8001}"
 PAPER_POLL_SECONDS="${PAPER_POLL_SECONDS:-60}"
+APP_VERSION="${APP_VERSION:-unknown}"
+if command -v git >/dev/null 2>&1; then
+  APP_VERSION="$(git rev-parse --short HEAD 2>/dev/null || echo "$APP_VERSION")"
+fi
 PASSTHROUGH_ARGS=()
 for arg in "$@"; do
   case "$arg" in
@@ -56,6 +60,8 @@ WorkingDirectory=${ROOT_DIR}
 Environment=HOST=${HOST}
 Environment=PORT=${REQUESTED_PORT}
 Environment=PAPER_POLL_SECONDS=${PAPER_POLL_SECONDS}
+Environment=APP_VERSION=${APP_VERSION}
+Environment=START_MODE=systemd
 ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground
 Restart=always
 RestartSec=5
@@ -269,6 +275,7 @@ echo "系统: ${PLATFORM}"
 echo "监听: http://127.0.0.1:${PORT} 以及 http://0.0.0.0:${PORT}"
 echo "回测系统: FastAPI Web/API"
 echo "模拟交易系统: Paper runner，每 ${PAPER_POLL_SECONDS} 秒轮询已收盘 K 线"
+echo "版本: ${APP_VERSION}"
 echo "停止: kill \$(cat runtime/start.pid)、Ctrl+C 或 systemctl stop weekly-web"
 
 PAPER_PID=""
@@ -291,11 +298,11 @@ cleanup() {
 trap 'cleanup 0' INT TERM
 trap 'cleanup $?' EXIT
 
-PAPER_POLL_SECONDS="$PAPER_POLL_SECONDS" "$VENV_PYTHON" -m app.paper_runner >> runtime/logs/paper_runner.log 2>&1 &
+APP_VERSION="$APP_VERSION" START_MODE="$START_MODE" PAPER_POLL_SECONDS="$PAPER_POLL_SECONDS" "$VENV_PYTHON" -m app.paper_runner >> runtime/logs/paper_runner.log 2>&1 &
 PAPER_PID="$!"
 echo "模拟交易系统已启动: pid=${PAPER_PID}, log=runtime/logs/paper_runner.log"
 
-"$VENV_PYTHON" -m uvicorn app.main:app --host "$HOST" --port "$PORT" &
+APP_VERSION="$APP_VERSION" START_MODE="$START_MODE" "$VENV_PYTHON" -m uvicorn app.main:app --host "$HOST" --port "$PORT" &
 WEB_PID="$!"
 echo "Web/回测系统已启动: pid=${WEB_PID}"
 
