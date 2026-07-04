@@ -8,7 +8,7 @@ WEB_SERVICE="${WEB_SERVICE:-weekly-web}"
 PAPER_SERVICE="${PAPER_SERVICE:-weekly-paper}"
 SERVICE_USER="${SERVICE_USER:-$(whoami)}"
 HOST="${HOST:-0.0.0.0}"
-PORT="${PORT:-8000}"
+PORT="${PORT:-8001}"
 PAPER_POLL_SECONDS="${PAPER_POLL_SECONDS:-60}"
 
 if ! command -v systemctl >/dev/null 2>&1; then
