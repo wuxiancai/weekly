@@ -294,7 +294,7 @@ HTML = """
   <main>
     <section class="toolbar">
       <label title="交易标的。推荐：BTCUSDT。此处固定按 Binance USDⓈ-M / U本位永续合约理解，不是币本位合约。">交易对<input id="symbol" value="BTCUSDT"></label>
-      <label title="K 线周期。推荐：周线 1w；切换到 1d/4h 时会自动套用当前交易对的独立周期默认参数。">周期<select id="interval" onchange="applyIntervalDefaults()"><option value="1w" selected>1w</option><option value="1d">1d</option><option value="4h">4h</option></select></label>
+      <label title="K 线周期。推荐：周线 1w；切换到 1d/4h/1h 时会自动套用当前交易对的独立周期默认参数。">周期<select id="interval" onchange="applyIntervalDefaults()"><option value="1w" selected>1w</option><option value="1d">1d</option><option value="4h">4h</option><option value="1h">1h</option></select></label>
       <label title="回测开始日期。推荐：2019-09-02；交易只从该日期后开始，指标可用之前历史预热。">开始日期<input id="start" value="2019-09-02"></label>
       <label title="回测结束日期。推荐：2026-06-29。">结束日期<input id="end" value="2026-06-29"></label>
       <label title="初始本金。复利=NO 时每笔按该固定本金开仓；复利=YES 时第一笔用该本金，之后按当前权益开仓。推荐：10000。">本金<input id="initialEquity" type="number" step="100" value="10000"></label>
@@ -318,8 +318,8 @@ HTML = """
       <label title="动态止盈最高 ATR 倍数上限。推荐：32。">止盈上限<input id="takeAtrMax" type="number" step="0.5" value="32"></label>
       <label title="动态止盈保护位缓冲比例。推荐：0。">止盈缓冲<input id="takeAtrBuffer" type="number" step="0.01" value="0"></label>
       <label title="成交量过滤倍数，当前量需大于成交量均线乘以该值。推荐：1。">量能倍数<input id="volumeMult" type="number" step="0.05" value="1"></label>
-      <label title="4h 状态切换策略。YES：先识别 TREND/RANGE/NEUTRAL，趋势市顺势，震荡市均值回归，过渡市少交易。推荐：4h YES，周线/日线 NO。">状态策略<select id="regimeSwitch"><option value="false" selected>NO</option><option value="true">YES</option></select></label>
-      <label title="趋势状态要求 EMA 与 MA 至少分离的比例。推荐：4h 0.006。">趋势间距<input id="trendMaGapMin" type="number" step="0.001" value="0.006"></label>
+      <label title="盘中状态切换策略。YES：先识别 TREND/RANGE/NEUTRAL，趋势市顺势，震荡市均值回归，过渡市少交易。推荐：1h/4h YES，周线/日线 NO。">状态策略<select id="regimeSwitch"><option value="false" selected>NO</option><option value="true">YES</option></select></label>
+      <label title="趋势状态要求 EMA 与 MA 至少分离的比例。推荐：1h/4h 0。">趋势间距<input id="trendMaGapMin" type="number" step="0.001" value="0.006"></label>
       <label title="震荡状态 ADX 上限。低于该值且布林带收窄时按震荡处理。推荐：18。">震荡ADX<input id="rangeAdxMax" type="number" step="1" value="18"></label>
       <label title="震荡状态布林带宽上限，(上轨-下轨)/中轨。推荐：0.08。">震荡带宽<input id="rangeBbWidthMax" type="number" step="0.005" value="0.08"></label>
       <label title="震荡策略做多 RSI 阈值。低于该值且接近布林下轨时做多。推荐：35。">震荡多RSI<input id="rangeRsiLow" type="number" value="35"></label>
@@ -384,6 +384,13 @@ const STRATEGY_DEFAULTS = {
       adxPeriod: 14, adx: 25, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
       stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8.0, takeAtrBuffer: 0, volumeMult: 1.0,
       regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 30, rangeRsiHigh: 65
+    },
+    '1h': {
+      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 8, ma: 35, rsiPeriod: 14, atrPeriod: 14,
+      adxPeriod: 14, adx: 25, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8.0, takeAtrBuffer: 0, volumeMult: 1.0,
+      regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 30, rangeRsiHigh: 65
     }
   },
   ETHUSDT: {
@@ -402,6 +409,13 @@ const STRATEGY_DEFAULTS = {
       regimeSwitch: false, trendMaGapMin: 0.006, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 35, rangeRsiHigh: 65
     },
     '4h': {
+      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 8, ma: 35, rsiPeriod: 14, atrPeriod: 14,
+      adxPeriod: 14, adx: 25, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8, takeAtrBuffer: 0, volumeMult: 1,
+      regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 30, rangeRsiHigh: 65
+    },
+    '1h': {
       start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
       feeRate: 0.0005, slippageRate: 0.0005, ema: 8, ma: 35, rsiPeriod: 14, atrPeriod: 14,
       adxPeriod: 14, adx: 25, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
@@ -721,7 +735,7 @@ PAPER_HTML = """
       <div class="metric"><span>模拟账户资金(USDT)</span><strong id="equity">-</strong></div>
       <div class="metric"><span>初始资金(USDT)</span><strong id="initial">1000.00</strong></div>
       <div class="metric"><span>复利</span><strong id="compound">YES</strong></div>
-      <div class="metric"><span>策略周期</span><strong>1d / 4h</strong></div>
+      <div class="metric"><span>策略周期</span><strong>1d / 4h / 1h</strong></div>
     </section>
     <section class="panel">
       <h2>当前持仓</h2>
@@ -748,7 +762,6 @@ async function loadStatus() {
   document.getElementById('equity').textContent = Number(account.equity || 0).toFixed(2);
   document.getElementById('initial').textContent = Number(account.initial_equity || 1000).toFixed(2);
   document.getElementById('compound').textContent = account.compound ? 'YES' : 'NO';
-  document.getElementById('leverage').textContent = Number(account.leverage || 0).toFixed(2);
   fillStrategies(data.strategies || []);
   fillPositions(data.positions || []);
   fillTrades(data.trades || []);
@@ -797,7 +810,7 @@ ETH_HTML = (
     .replace("const PAGE_SYMBOL = 'BTCUSDT';", "const PAGE_SYMBOL = 'ETHUSDT';")
     .replace("const PAGE_INTERVAL = '1w';", "const PAGE_INTERVAL = '1d';")
     .replace("周期 1w", "周期 1d")
-    .replace('<option value="1w" selected>1w</option><option value="1d">1d</option><option value="4h">4h</option>', '<option value="1w">1w</option><option value="1d" selected>1d</option><option value="4h">4h</option>')
+    .replace('<option value="1w" selected>1w</option><option value="1d">1d</option><option value="4h">4h</option><option value="1h">1h</option>', '<option value="1w">1w</option><option value="1d" selected>1d</option><option value="4h">4h</option><option value="1h">1h</option>')
     .replace("动态止盈启动 ATR 倍数。推荐：7.5", "动态止盈启动 ATR 倍数。推荐：6.5")
     .replace('id="takeAtr" type="number" step="0.1" value="7.5"', 'id="takeAtr" type="number" step="0.1" value="6.5"')
     .replace("动态止盈最高 ATR 倍数上限。推荐：32", "动态止盈最高 ATR 倍数上限。推荐：24")

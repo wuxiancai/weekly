@@ -79,7 +79,20 @@ def paper_strategy_defaults() -> list[PaperStrategyConfig]:
         volume_mult=1.0,
         regime_switch=False,
     )
-    four_hour = StrategyParams(
+    four_hour = _intraday_regime_params()
+    one_hour = _intraday_regime_params()
+    return [
+        PaperStrategyConfig("BTCUSDT", "1d", btc_daily),
+        PaperStrategyConfig("BTCUSDT", "4h", four_hour),
+        PaperStrategyConfig("BTCUSDT", "1h", one_hour),
+        PaperStrategyConfig("ETHUSDT", "1d", eth_daily),
+        PaperStrategyConfig("ETHUSDT", "4h", four_hour),
+        PaperStrategyConfig("ETHUSDT", "1h", one_hour),
+    ]
+
+
+def _intraday_regime_params() -> StrategyParams:
+    return StrategyParams(
         ema_period=8,
         ma_period=35,
         rsi_period=14,
@@ -103,12 +116,6 @@ def paper_strategy_defaults() -> list[PaperStrategyConfig]:
         range_rsi_low=30,
         range_rsi_high=65,
     )
-    return [
-        PaperStrategyConfig("BTCUSDT", "1d", btc_daily),
-        PaperStrategyConfig("BTCUSDT", "4h", four_hour),
-        PaperStrategyConfig("ETHUSDT", "1d", eth_daily),
-        PaperStrategyConfig("ETHUSDT", "4h", four_hour),
-    ]
 
 
 def init_paper_schema(conn: Any) -> None:

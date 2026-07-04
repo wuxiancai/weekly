@@ -21,3 +21,8 @@ class DeployScriptTests(unittest.TestCase):
 
         self.assertIn(".venv", script)
         self.assertIn("app.paper_runner", script)
+
+    def test_paper_runner_supports_one_hour_interval(self) -> None:
+        runner = (ROOT / "app" / "paper_runner.py").read_text()
+
+        self.assertIn('"1h": 60 * 60 * 1000', runner)

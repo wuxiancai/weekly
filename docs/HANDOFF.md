@@ -296,6 +296,19 @@
   - `ETHUSDT / 1d`：复用 ETH 日线默认 `EMA15 / MA40`、`ADX >= 0`、多头 RSI `35-85`、止损 `1.8 ATR`、动态止盈启动 `6.5 ATR`、阶梯 `1.25`、上限 `24`、量能 `1`。
   - `ETHUSDT / 4h`：保留状态切换默认策略。
 - `/paper` 状态页顶部改为展示策略周期 `1d / 4h`。
+
+## 2026-07-04 增加 1h 独立周期策略
+
+- 用户要求根据 `1d`、`4h` 的交易策略模块和回测模块逻辑，增加 BTCUSDT / ETHUSDT 的 `1h` 独立交易和回测模块。
+- Web 页面更新：
+  - `周期` 下拉新增 `1h`。
+  - `STRATEGY_DEFAULTS.BTCUSDT['1h']` 与 `STRATEGY_DEFAULTS.ETHUSDT['1h']` 已新增独立配置。
+  - `1h` 第一版采用盘中状态切换策略：`EMA8 / MA35`、`ADX >= 25`、趋势/震荡/过渡状态切换、震荡 RSI `30/65`、止损 `0.8 ATR`、动态止盈启动 `3.5 ATR`、阶梯 `0.5`、上限 `8`、无杠杆、复利。
+- Paper Trading 更新：
+  - 默认策略池扩展为六个：`BTCUSDT / 1d`、`BTCUSDT / 4h`、`BTCUSDT / 1h`、`ETHUSDT / 1d`、`ETHUSDT / 4h`、`ETHUSDT / 1h`。
+  - `app.paper_runner.INTERVAL_MS` 新增 `1h`，后台会按已收盘 1h K 线增量处理。
+  - `/paper` 状态页顶部策略周期改为 `1d / 4h / 1h`。
+- 注意：当前 `1h` 参数是独立默认槽位的初始版本，尚未基于本地 1h 历史数据单独优化。
 - 页面 `周期` 下拉已新增 `4h`。
 - `STRATEGY_DEFAULTS` 已新增独立 4h 默认参数：
   - `BTCUSDT / 4h`：当前先复制 `BTCUSDT / 1d` 默认参数，`EMA8 / MA40`、无杠杆、复利、止损 `1.6 ATR`、动态止盈启动 `13 ATR`、止盈阶梯 `0.75 ATR`、止盈上限 `18 ATR`、量能 `0.75`。
