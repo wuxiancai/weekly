@@ -755,7 +755,7 @@ PAPER_HTML = """
 </head>
 <body>
   <header>
-    <h1>BTCUSDT / ETHUSDT U本位永续合约模拟交易</h1>
+    <h1>币安合约交易系统</h1>
     <div class="market-ticker" id="marketTicker">
       <div class="ticker-row">
         <span class="ticker-item" id="tickerBtc"><span class="ticker-label">BTC 永续</span><span class="ticker-price">-</span><span class="ticker-change">-</span></span>

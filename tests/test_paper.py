@@ -88,6 +88,8 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn('href="/paper">模拟交易</a>', HTML)
 
     def test_paper_page_shows_realtime_futures_ticker_and_utc8_clock(self) -> None:
+        self.assertIn("<h1>币安合约交易系统</h1>", PAPER_HTML)
+        self.assertNotIn("<h1>BTCUSDT / ETHUSDT U本位永续合约模拟交易</h1>", PAPER_HTML)
         self.assertIn('id="marketTicker"', PAPER_HTML)
         self.assertIn('id="tickerBtc"', PAPER_HTML)
         self.assertIn('id="tickerEth"', PAPER_HTML)
