@@ -614,6 +614,8 @@ kill $(cat runtime/start.pid)
 - 修改：
   - 根目录 `start.sh` 默认模式在 systemd 环境下不再起临时 `8002` 进程，而是写入/更新 `weekly-web.service`，`ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground`，然后 `systemctl restart weekly-web`。
   - 根目录 `start.sh` 会停止、禁用并删除旧 `weekly-paper.service`。
+  - 根目录 `start.sh` 会先 `systemctl stop weekly-web`，再清理本项目遗留 Python 进程，避免旧 service 自动重启抢占端口。
+  - `--foreground` 模式里的 Web 输出已写入 `runtime/logs/web.log`，不再直接把 uvicorn 的 `Press CTRL+C to quit` 打到手动终端。
   - `scripts/deploy_one_click.sh` 复用根目录 `start.sh` 做 systemd 安装和重启，避免两套 unit 写法漂移。
   - 非 systemd 环境保留 `nohup "$0" --foreground` fallback。
 - 服务器更新到此版本后，执行：

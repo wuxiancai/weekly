@@ -39,12 +39,17 @@ class DeployScriptTests(unittest.TestCase):
         self.assertIn('START_MODE="${START_MODE:-daemon}"', script)
         self.assertIn("install_or_restart_systemd_service", script)
         self.assertIn("LEGACY_PAPER_SERVICE", script)
+        self.assertIn('sudo systemctl stop "${WEB_SERVICE}.service"', script)
+        self.assertIn('stop_existing_project_processes', script)
         self.assertIn("ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground", script)
         self.assertIn('sudo systemctl restart "${WEB_SERVICE}.service"', script)
         self.assertIn("start.sh 已交给 systemd 托管", script)
         self.assertIn('nohup "$0" --foreground', script)
         self.assertIn("runtime/start.pid", script)
         self.assertIn("runtime/logs/start.log", script)
+        self.assertIn("runtime/logs/web.log", script)
+        self.assertNotIn("Ctrl+C", script)
+        self.assertNotIn("Press CTRL+C", script)
         self.assertIn("start.sh 已在后台启动", script)
 
     def test_legacy_systemd_installer_defaults_to_port_8001(self) -> None:

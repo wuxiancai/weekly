@@ -42,11 +42,42 @@ has_systemd() {
   command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]
 }
 
+stop_existing_project_processes() {
+  local patterns=(
+    "$ROOT_DIR/.venv/bin/python.*uvicorn app.main:app"
+    "$ROOT_DIR/.venv/bin/python3.*uvicorn app.main:app"
+    "$ROOT_DIR/.venv/bin/python.*app.paper_runner"
+    "$ROOT_DIR/.venv/bin/python3.*app.paper_runner"
+  )
+  local pid
+  local pids=()
+
+  for pattern in "${patterns[@]}"; do
+    while IFS= read -r pid; do
+      [ -n "$pid" ] || continue
+      [ "$pid" != "$$" ] || continue
+      pids+=("$pid")
+    done < <(pgrep -f "$pattern" 2>/dev/null || true)
+  done
+
+  if [ "${#pids[@]}" -gt 0 ]; then
+    echo "发现本项目已有运行进程，先停止: ${pids[*]}"
+    kill "${pids[@]}" 2>/dev/null || true
+    sleep 2
+    for pid in "${pids[@]}"; do
+      if kill -0 "$pid" 2>/dev/null; then
+        kill -9 "$pid" 2>/dev/null || true
+      fi
+    done
+  fi
+}
+
 install_or_restart_systemd_service() {
   if ! command -v sudo >/dev/null 2>&1; then
     return 1
   fi
 
+  sudo systemctl stop "${WEB_SERVICE}.service" 2>/dev/null || true
   sudo tee "/etc/systemd/system/${WEB_SERVICE}.service" >/dev/null <<SERVICE
 [Unit]
 Description=Weekly BTCUSDT/ETHUSDT web backtest and paper runner
@@ -77,6 +108,7 @@ SERVICE
   if [ -f "/etc/systemd/system/${LEGACY_PAPER_SERVICE}.service" ]; then
     sudo rm -f "/etc/systemd/system/${LEGACY_PAPER_SERVICE}.service"
   fi
+  stop_existing_project_processes
 
   sudo systemctl daemon-reload
   sudo systemctl enable "${WEB_SERVICE}.service" >/dev/null
@@ -149,36 +181,6 @@ fi
 
 "$VENV_PYTHON" -m pip install --upgrade pip >/dev/null
 "$VENV_PYTHON" -m pip install -r requirements.txt
-
-stop_existing_project_processes() {
-  local patterns=(
-    "$ROOT_DIR/.venv/bin/python.*uvicorn app.main:app"
-    "$ROOT_DIR/.venv/bin/python3.*uvicorn app.main:app"
-    "$ROOT_DIR/.venv/bin/python.*app.paper_runner"
-    "$ROOT_DIR/.venv/bin/python3.*app.paper_runner"
-  )
-  local pid
-  local pids=()
-
-  for pattern in "${patterns[@]}"; do
-    while IFS= read -r pid; do
-      [ -n "$pid" ] || continue
-      [ "$pid" != "$$" ] || continue
-      pids+=("$pid")
-    done < <(pgrep -f "$pattern" 2>/dev/null || true)
-  done
-
-  if [ "${#pids[@]}" -gt 0 ]; then
-    echo "发现本项目已有运行进程，先停止: ${pids[*]}"
-    kill "${pids[@]}" 2>/dev/null || true
-    sleep 2
-    for pid in "${pids[@]}"; do
-      if kill -0 "$pid" 2>/dev/null; then
-        kill -9 "$pid" 2>/dev/null || true
-      fi
-    done
-  fi
-}
 
 stop_existing_project_processes
 
@@ -276,7 +278,7 @@ echo "监听: http://127.0.0.1:${PORT} 以及 http://0.0.0.0:${PORT}"
 echo "回测系统: FastAPI Web/API"
 echo "模拟交易系统: Paper runner，每 ${PAPER_POLL_SECONDS} 秒轮询已收盘 K 线"
 echo "版本: ${APP_VERSION}"
-echo "停止: kill \$(cat runtime/start.pid)、Ctrl+C 或 systemctl stop weekly-web"
+echo "停止: kill \$(cat runtime/start.pid) 或 systemctl stop weekly-web"
 
 PAPER_PID=""
 WEB_PID=""
@@ -302,9 +304,9 @@ APP_VERSION="$APP_VERSION" START_MODE="$START_MODE" PAPER_POLL_SECONDS="$PAPER_P
 PAPER_PID="$!"
 echo "模拟交易系统已启动: pid=${PAPER_PID}, log=runtime/logs/paper_runner.log"
 
-APP_VERSION="$APP_VERSION" START_MODE="$START_MODE" "$VENV_PYTHON" -m uvicorn app.main:app --host "$HOST" --port "$PORT" &
+APP_VERSION="$APP_VERSION" START_MODE="$START_MODE" "$VENV_PYTHON" -m uvicorn app.main:app --host "$HOST" --port "$PORT" >> runtime/logs/web.log 2>&1 &
 WEB_PID="$!"
-echo "Web/回测系统已启动: pid=${WEB_PID}"
+echo "Web/回测系统已启动: pid=${WEB_PID}, log=runtime/logs/web.log"
 
 while true; do
   if ! kill -0 "$WEB_PID" 2>/dev/null; then
