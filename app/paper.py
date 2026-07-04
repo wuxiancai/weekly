@@ -80,14 +80,15 @@ def paper_strategy_defaults() -> list[PaperStrategyConfig]:
         regime_switch=False,
     )
     four_hour = _intraday_regime_params()
-    one_hour = _intraday_regime_params()
+    btc_one_hour = _btc_one_hour_params()
+    eth_one_hour = _eth_one_hour_params()
     return [
         PaperStrategyConfig("BTCUSDT", "1d", btc_daily),
         PaperStrategyConfig("BTCUSDT", "4h", four_hour),
-        PaperStrategyConfig("BTCUSDT", "1h", one_hour),
+        PaperStrategyConfig("BTCUSDT", "1h", btc_one_hour),
         PaperStrategyConfig("ETHUSDT", "1d", eth_daily),
         PaperStrategyConfig("ETHUSDT", "4h", four_hour),
-        PaperStrategyConfig("ETHUSDT", "1h", one_hour),
+        PaperStrategyConfig("ETHUSDT", "1h", eth_one_hour),
     ]
 
 
@@ -113,6 +114,60 @@ def _intraday_regime_params() -> StrategyParams:
         trend_ma_gap_min=0.0,
         range_adx_max=18,
         range_bb_width_max=0.08,
+        range_rsi_low=30,
+        range_rsi_high=65,
+    )
+
+
+def _btc_one_hour_params() -> StrategyParams:
+    return StrategyParams(
+        ema_period=12,
+        ma_period=35,
+        rsi_period=14,
+        atr_period=14,
+        adx_period=14,
+        adx_min=18,
+        long_rsi_min=55,
+        long_rsi_max=85,
+        short_rsi_min=0,
+        short_rsi_max=100,
+        stop_atr=0.45,
+        take_atr=4.0,
+        take_atr_step=1.0,
+        take_atr_max=12.0,
+        take_atr_buffer_pct=0.0,
+        volume_mult=1.25,
+        regime_switch=True,
+        trend_ma_gap_min=0.0,
+        range_adx_max=22,
+        range_bb_width_max=0.05,
+        range_rsi_low=35,
+        range_rsi_high=65,
+    )
+
+
+def _eth_one_hour_params() -> StrategyParams:
+    return StrategyParams(
+        ema_period=15,
+        ma_period=50,
+        rsi_period=14,
+        atr_period=14,
+        adx_period=14,
+        adx_min=25,
+        long_rsi_min=50,
+        long_rsi_max=80,
+        short_rsi_min=0,
+        short_rsi_max=100,
+        stop_atr=0.45,
+        take_atr=1.8,
+        take_atr_step=0.5,
+        take_atr_max=4.0,
+        take_atr_buffer_pct=0.0,
+        volume_mult=1.0,
+        regime_switch=True,
+        trend_ma_gap_min=0.0,
+        range_adx_max=22,
+        range_bb_width_max=0.12,
         range_rsi_low=30,
         range_rsi_high=65,
     )

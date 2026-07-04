@@ -387,10 +387,10 @@ const STRATEGY_DEFAULTS = {
     },
     '1h': {
       start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
-      feeRate: 0.0005, slippageRate: 0.0005, ema: 8, ma: 35, rsiPeriod: 14, atrPeriod: 14,
-      adxPeriod: 14, adx: 25, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
-      stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8.0, takeAtrBuffer: 0, volumeMult: 1.0,
-      regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 30, rangeRsiHigh: 65
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 12, ma: 35, rsiPeriod: 14, atrPeriod: 14,
+      adxPeriod: 14, adx: 18, longRsiMin: 55, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 0.45, takeAtr: 4.0, takeAtrStep: 1.0, takeAtrMax: 12.0, takeAtrBuffer: 0, volumeMult: 1.25,
+      regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 22, rangeBbWidthMax: 0.05, rangeRsiLow: 35, rangeRsiHigh: 65
     }
   },
   ETHUSDT: {
@@ -417,10 +417,10 @@ const STRATEGY_DEFAULTS = {
     },
     '1h': {
       start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
-      feeRate: 0.0005, slippageRate: 0.0005, ema: 8, ma: 35, rsiPeriod: 14, atrPeriod: 14,
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 15, ma: 50, rsiPeriod: 14, atrPeriod: 14,
       adxPeriod: 14, adx: 25, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
-      stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8, takeAtrBuffer: 0, volumeMult: 1,
-      regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 30, rangeRsiHigh: 65
+      stopAtr: 0.45, takeAtr: 1.8, takeAtrStep: 0.5, takeAtrMax: 4, takeAtrBuffer: 0, volumeMult: 1,
+      regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 22, rangeBbWidthMax: 0.12, rangeRsiLow: 30, rangeRsiHigh: 65
     }
   }
 };

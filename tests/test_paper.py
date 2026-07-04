@@ -37,8 +37,13 @@ class PaperTradingTests(unittest.TestCase):
         self.assertTrue(params_by_key[("ETHUSDT", "4h")].regime_switch)
         self.assertTrue(params_by_key[("BTCUSDT", "1h")].regime_switch)
         self.assertTrue(params_by_key[("ETHUSDT", "1h")].regime_switch)
-        self.assertEqual(params_by_key[("BTCUSDT", "1h")].ema_period, 8)
-        self.assertEqual(params_by_key[("ETHUSDT", "1h")].ma_period, 35)
+        self.assertEqual(params_by_key[("BTCUSDT", "1h")].ema_period, 12)
+        self.assertEqual(params_by_key[("BTCUSDT", "1h")].adx_min, 18)
+        self.assertEqual(params_by_key[("BTCUSDT", "1h")].stop_atr, 0.45)
+        self.assertEqual(params_by_key[("BTCUSDT", "1h")].take_atr_max, 12.0)
+        self.assertEqual(params_by_key[("ETHUSDT", "1h")].ma_period, 50)
+        self.assertEqual(params_by_key[("ETHUSDT", "1h")].take_atr, 1.8)
+        self.assertEqual(params_by_key[("ETHUSDT", "1h")].range_bb_width_max, 0.12)
 
     def test_paper_engine_initializes_account_and_strategies_once(self) -> None:
         conn = sqlite3.connect(":memory:")
