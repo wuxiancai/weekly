@@ -780,7 +780,7 @@ PAPER_HTML = """
       <div class="metric"><span>模拟账户资金(USDT)</span><strong id="equity">-</strong></div>
       <div class="metric"><span>初始资金(USDT)</span><strong id="initial">1000.00</strong></div>
       <div class="metric"><span>复利</span><strong id="compound">YES</strong></div>
-      <div class="metric"><span>策略周期</span><strong>1d / 4h / 1h</strong></div>
+      <div class="metric"><span>策略周期</span><strong id="strategyIntervals">-</strong></div>
     </section>
     <section class="panel">
       <h2>当前持仓</h2>
@@ -817,6 +817,7 @@ async function loadStatus() {
   document.getElementById('equity').textContent = Number(account.equity || 0).toFixed(2);
   document.getElementById('initial').textContent = Number(account.initial_equity || 1000).toFixed(2);
   document.getElementById('compound').textContent = account.compound ? 'YES' : 'NO';
+  updateStrategyIntervals(data.strategies || []);
   fillStrategies(data.strategies || []);
   fillPositions(data.positions || []);
   fillTradeRecords(data.trade_records || data.trades || []);
@@ -910,6 +911,12 @@ function updateUtc8Clock() {
   document.getElementById('utc8Clock').textContent = text;
 }
 function date(ms) { return ms ? new Date(Number(ms)).toLocaleString() : '-'; }
+function updateStrategyIntervals(strategies) {
+  const intervalOrder = ['1w', '1d', '4h', '1h'];
+  const active = new Set(strategies.filter(s => s.enabled).map(s => s.interval));
+  const ordered = intervalOrder.filter(interval => active.has(interval));
+  document.getElementById('strategyIntervals').textContent = ordered.length ? ordered.join(' / ') : '-';
+}
 function fillStrategies(items) {
   document.getElementById('strategies').innerHTML = items.map(s => `
     <tr><td>${s.symbol}</td><td>${s.interval}</td><td>${s.enabled ? 'YES' : 'NO'}</td><td>${date(s.last_processed_open_time)}</td><td class="muted">${summary(s.params)}</td></tr>

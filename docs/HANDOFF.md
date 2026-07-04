@@ -552,6 +552,27 @@ http://127.0.0.1:8001
   - 如果候选端口被其他应用占用，自动顺延到下一个端口，例如 `8002`、`8003`。
   - 默认最多从起始端口向后检查 50 个端口。
 
+## 2026-07-04 Paper 增加 1w 并动态展示策略周期
+
+- 用户截图显示 `/paper` 顶部策略周期仍是 `1d / 4h`，询问 `1w`、`1h` 是否没有模拟交易。
+- 核对代码后结论：
+  - `1h` 已经在本地代码中纳入 Paper Trading，截图对应远端页面是旧版本或服务未重启。
+  - `1w` 周线此前确实没有加入 Paper Trading 默认策略池。
+- `app/paper.py` 已将默认策略池扩展为 8 个：
+  - `BTCUSDT / 1w`
+  - `BTCUSDT / 1d`
+  - `BTCUSDT / 4h`
+  - `BTCUSDT / 1h`
+  - `ETHUSDT / 1w`
+  - `ETHUSDT / 1d`
+  - `ETHUSDT / 4h`
+  - `ETHUSDT / 1h`
+- `1w` 使用已固化周线默认参数：`EMA15 / MA40`、`ADX >= 0`、多头 RSI `35-85`、空头 RSI `0-100`、止损 `1.8 ATR`、动态止盈启动 `7.5 ATR`、阶梯 `1.25 ATR`、上限 `32 ATR`、`volume_mult = 1`。
+- `/paper` 顶部“策略周期”改为从 `/api/paper/status` 的已启用策略动态计算，按 `1w / 1d / 4h / 1h` 顺序展示，不再写死。
+- 验证：
+  - 目标测试红灯确认旧行为缺 `1w` 且页面硬编码。
+  - 修改后目标测试通过：`test_paper_defaults_use_shared_1000_usdt_account_and_all_strategy_intervals`、`test_paper_engine_initializes_account_and_strategies_once`、`test_paper_page_derives_strategy_intervals_from_status`。
+
 ## 下一步建议
 
 1. 在页面点击“同步 Binance 数据”确认 2019-09-02 到 2026-06-29 的周线入库。

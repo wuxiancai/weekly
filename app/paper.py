@@ -41,6 +41,7 @@ class ProcessResult:
 
 
 def paper_strategy_defaults() -> list[PaperStrategyConfig]:
+    weekly = _weekly_params()
     btc_daily = StrategyParams(
         ema_period=8,
         ma_period=40,
@@ -83,13 +84,42 @@ def paper_strategy_defaults() -> list[PaperStrategyConfig]:
     btc_one_hour = _btc_one_hour_params()
     eth_one_hour = _eth_one_hour_params()
     return [
+        PaperStrategyConfig("BTCUSDT", "1w", weekly),
         PaperStrategyConfig("BTCUSDT", "1d", btc_daily),
         PaperStrategyConfig("BTCUSDT", "4h", four_hour),
         PaperStrategyConfig("BTCUSDT", "1h", btc_one_hour),
+        PaperStrategyConfig("ETHUSDT", "1w", weekly),
         PaperStrategyConfig("ETHUSDT", "1d", eth_daily),
         PaperStrategyConfig("ETHUSDT", "4h", four_hour),
         PaperStrategyConfig("ETHUSDT", "1h", eth_one_hour),
     ]
+
+
+def _weekly_params() -> StrategyParams:
+    return StrategyParams(
+        ema_period=15,
+        ma_period=40,
+        rsi_period=14,
+        atr_period=14,
+        adx_period=14,
+        adx_min=0,
+        long_rsi_min=35,
+        long_rsi_max=85,
+        short_rsi_min=0,
+        short_rsi_max=100,
+        stop_atr=1.8,
+        take_atr=7.5,
+        take_atr_step=1.25,
+        take_atr_max=32.0,
+        take_atr_buffer_pct=0.0,
+        volume_mult=1.0,
+        regime_switch=False,
+        trend_ma_gap_min=0.006,
+        range_adx_max=18,
+        range_bb_width_max=0.08,
+        range_rsi_low=35,
+        range_rsi_high=65,
+    )
 
 
 def _intraday_regime_params() -> StrategyParams:

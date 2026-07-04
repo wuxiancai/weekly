@@ -36,7 +36,7 @@
 - BTCUSDT 日线默认参数已单独优化为无杠杆、复利、最大单笔回撤 50% 内收益优先组合；不影响已固化的 BTCUSDT 周线默认策略。
 - BTCUSDT 与 ETHUSDT 的 `4h` 已启用状态切换策略：趋势市使用 EMA/MA 顺势策略，震荡市使用布林带 + RSI 均值回归，过渡市空仓或少交易；两个交易对的 4h 默认参数相互独立。
 - BTCUSDT 与 ETHUSDT 的 `1h` 已按本地 `2019-09-02 -> 2026-06-29` 历史数据独立优化默认参数；两个交易对 1h 默认值相互独立，也不复用 4h 默认参数。
-- 已新增实盘模拟 / Paper Trading 运行态：默认一个共享 `1000 USDT` 模拟账户，同时运行 `BTCUSDT / 1d`、`BTCUSDT / 4h`、`BTCUSDT / 1h`、`ETHUSDT / 1d`、`ETHUSDT / 4h`、`ETHUSDT / 1h` 独立策略；只使用 Binance USDⓈ-M Futures 行情，不提交真实订单。
+- 已新增实盘模拟 / Paper Trading 运行态：默认一个共享 `1000 USDT` 模拟账户，同时运行 `BTCUSDT / 1w`、`BTCUSDT / 1d`、`BTCUSDT / 4h`、`BTCUSDT / 1h`、`ETHUSDT / 1w`、`ETHUSDT / 1d`、`ETHUSDT / 4h`、`ETHUSDT / 1h` 独立策略；只使用 Binance USDⓈ-M Futures 行情，不提交真实订单。
 - 模拟交易后台使用 REST 轮询已收盘 K 线，首次启动只预热指标并定位最新已收盘 K 线，避免把历史信号误当成实时成交；后续每根 K 线只处理一次，状态写入 SQLite。
 - Web 新增 `/paper` 状态页，展示模拟账户资金、当前持仓、策略处理进度、最近平仓和运行日志。
 - 根目录 `./start.sh` 是统一运行入口：先停止本项目旧 Web/Paper 进程，再启动 FastAPI 回测系统和 Paper runner；云服务器 systemd 服务也只调用该入口。

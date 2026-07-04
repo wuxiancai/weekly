@@ -12,22 +12,29 @@ from app.paper import (
 
 
 class PaperTradingTests(unittest.TestCase):
-    def test_paper_defaults_use_shared_1000_usdt_account_and_daily_4h_1h_strategies(self) -> None:
+    def test_paper_defaults_use_shared_1000_usdt_account_and_all_strategy_intervals(self) -> None:
         strategies = paper_strategy_defaults()
 
         self.assertEqual(PAPER_DEFAULT_INITIAL_EQUITY, 1000.0)
         self.assertEqual(
             [(s.symbol, s.interval) for s in strategies],
             [
+                ("BTCUSDT", "1w"),
                 ("BTCUSDT", "1d"),
                 ("BTCUSDT", "4h"),
                 ("BTCUSDT", "1h"),
+                ("ETHUSDT", "1w"),
                 ("ETHUSDT", "1d"),
                 ("ETHUSDT", "4h"),
                 ("ETHUSDT", "1h"),
             ],
         )
         params_by_key = {(s.symbol, s.interval): s.params for s in strategies}
+        self.assertFalse(params_by_key[("BTCUSDT", "1w")].regime_switch)
+        self.assertEqual(params_by_key[("BTCUSDT", "1w")].ema_period, 15)
+        self.assertEqual(params_by_key[("BTCUSDT", "1w")].take_atr_max, 32.0)
+        self.assertFalse(params_by_key[("ETHUSDT", "1w")].regime_switch)
+        self.assertEqual(params_by_key[("ETHUSDT", "1w")].take_atr, 7.5)
         self.assertFalse(params_by_key[("BTCUSDT", "1d")].regime_switch)
         self.assertEqual(params_by_key[("BTCUSDT", "1d")].ema_period, 8)
         self.assertEqual(params_by_key[("BTCUSDT", "1d")].take_atr, 13.0)
@@ -60,7 +67,7 @@ class PaperTradingTests(unittest.TestCase):
 
         self.assertEqual(account["initial_equity"], 1000.0)
         self.assertEqual(account["equity"], 1000.0)
-        self.assertEqual(len(strategies), 6)
+        self.assertEqual(len(strategies), 8)
 
     def test_paper_status_returns_full_trade_records_separate_from_recent_trades(self) -> None:
         conn = sqlite3.connect(":memory:")
@@ -156,6 +163,13 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn('id="tradeRecords"', PAPER_HTML)
         self.assertIn("fillTradeRecords(data.trade_records || data.trades || []);", PAPER_HTML)
         self.assertIn("function fillTradeRecords(items)", PAPER_HTML)
+
+    def test_paper_page_derives_strategy_intervals_from_status(self) -> None:
+        self.assertIn('id="strategyIntervals"', PAPER_HTML)
+        self.assertIn("updateStrategyIntervals(data.strategies || []);", PAPER_HTML)
+        self.assertIn("function updateStrategyIntervals(strategies)", PAPER_HTML)
+        self.assertIn("intervalOrder = ['1w', '1d', '4h', '1h'];", PAPER_HTML)
+        self.assertNotIn("<strong>1d / 4h / 1h</strong>", PAPER_HTML)
 
     def test_market_tickers_api_returns_utc_day_price_changes(self) -> None:
         class FakeClient:
