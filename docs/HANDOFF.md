@@ -645,6 +645,31 @@ curl -s http://127.0.0.1:8001/api/system/runtime
 - `start.sh` 会把当前 `git rev-parse --short HEAD` 写入 `APP_VERSION`，systemd unit 也会带上该环境变量。
 - 用途：以后出现“端口有监听但页面还是旧”的情况，先查 `/api/system/runtime`，确认服务实际运行 commit 和页面标记。
 
+## 2026-07-04 8002 残留旧进程与 Paper 页面旧版本诊断
+
+- 用户重新部署后反馈 `8001` 和 `8002` 都能访问，且 `/paper` 页面仍显示旧标题 `BTCUSDT / ETHUSDT U本位永续合约模拟交易` 和策略周期 `1d / 4h`。
+- 本地当前代码结论：
+  - `PAPER_HTML` 不再硬编码 `1d / 4h`，而是通过 `id="strategyIntervals"` 从 `/api/paper/status` 返回的启用策略动态计算。
+  - `paper_strategy_defaults()` 当前应初始化 8 个策略：`BTCUSDT/ETHUSDT` 各 `1w / 1d / 4h / 1h`。
+  - 因此截图中的旧标题和 `1d / 4h` 不是当前代码渲染结果，而是远端仍有旧 Web 进程或旧代码实例在提供页面。
+- 本次修正：
+  - `start.sh` 的旧进程清理范围从本项目 `.venv` 下的 `uvicorn` / `app.paper_runner` 扩展到本项目根目录 `start.sh` 和旧 `scripts/start.sh` supervisor，避免旧 `8002` shell supervisor 残留。
+  - 新增 `scripts/diagnose_runtime.sh`，用于在服务器上同时检查 `8001/8002` 的监听进程、`/api/system/runtime` 返回 commit、以及 `/paper` HTML 是否仍是旧硬编码标题/周期。
+- 服务器更新到此版本后建议执行：
+
+```bash
+git pull
+chmod +x start.sh scripts/diagnose_runtime.sh
+./start.sh
+./scripts/diagnose_runtime.sh
+```
+
+- 预期结果：
+  - 只有 `8001` 是本项目服务；如果 `8002` 仍监听，诊断脚本会显示它的 PID 和运行版本。
+  - `/api/system/runtime.paper_html_markers.hardcoded_old_intervals=false`。
+  - `/api/system/runtime.paper_html_markers.dynamic_strategy_intervals=true`。
+  - `/api/paper/status` 的 `strategies` 应包含 8 条策略。
+
 ## 下一步建议
 
 1. 在页面点击“同步 Binance 数据”确认 2019-09-02 到 2026-06-29 的周线入库。

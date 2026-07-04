@@ -44,6 +44,8 @@ has_systemd() {
 
 stop_existing_project_processes() {
   local patterns=(
+    "$ROOT_DIR/start.sh"
+    "$ROOT_DIR/scripts/start.sh"
     "$ROOT_DIR/.venv/bin/python.*uvicorn app.main:app"
     "$ROOT_DIR/.venv/bin/python3.*uvicorn app.main:app"
     "$ROOT_DIR/.venv/bin/python.*app.paper_runner"
@@ -56,6 +58,7 @@ stop_existing_project_processes() {
     while IFS= read -r pid; do
       [ -n "$pid" ] || continue
       [ "$pid" != "$$" ] || continue
+      [ "$pid" != "${PPID:-}" ] || continue
       pids+=("$pid")
     done < <(pgrep -f "$pattern" 2>/dev/null || true)
   done

@@ -28,6 +28,8 @@ class DeployScriptTests(unittest.TestCase):
 
         self.assertIn("stop_existing_project_processes", script)
         self.assertIn("pgrep -f", script)
+        self.assertIn('"$ROOT_DIR/start.sh"', script)
+        self.assertIn('"$ROOT_DIR/scripts/start.sh"', script)
         self.assertIn("app.paper_runner", script)
         self.assertIn("uvicorn app.main:app", script)
         self.assertIn("PAPER_POLL_SECONDS", script)
@@ -51,6 +53,15 @@ class DeployScriptTests(unittest.TestCase):
         self.assertNotIn("Ctrl+C", script)
         self.assertNotIn("Press CTRL+C", script)
         self.assertIn("start.sh 已在后台启动", script)
+
+    def test_runtime_diagnosis_script_checks_ports_and_html_markers(self) -> None:
+        script = (ROOT / "scripts" / "diagnose_runtime.sh").read_text()
+
+        self.assertIn("8001 8002", script)
+        self.assertIn("/api/system/runtime", script)
+        self.assertIn("/paper", script)
+        self.assertIn("OLD hardcoded title", script)
+        self.assertIn("strategyIntervals", script)
 
     def test_legacy_systemd_installer_defaults_to_port_8001(self) -> None:
         script = (ROOT / "scripts" / "install_systemd_service.sh").read_text()
