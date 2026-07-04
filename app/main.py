@@ -261,7 +261,7 @@ HTML = """
     button { border:1px solid #3b4654; background:#202733; color:var(--text); border-radius:6px; padding:10px 12px; cursor:pointer; font-weight:650; min-height:38px; width:100%; }
     button.primary { background:#1b6b50; border-color:#27936f; }
     button:hover { filter:brightness(1.12); }
-    .grid { display:grid; grid-template-columns: repeat(6, 1fr); gap:0; overflow:hidden; }
+    .grid { display:grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap:0; overflow:hidden; }
     .metric { padding:13px; border-right:1px solid var(--line); }
     .metric:last-child { border-right:0; }
     .metric span { display:block; color:var(--muted); font-size:12px; margin-bottom:6px; }
@@ -333,6 +333,7 @@ HTML = """
       <div class="metric"><span>最终资金(USDT)</span><strong id="finalEquity">-</strong></div>
       <div class="metric"><span>总收益率</span><strong id="returnPct">-</strong></div>
       <div class="metric"><span>最大单笔回撤</span><strong id="drawdown">-</strong></div>
+      <div class="metric"><span>单笔最大亏损率</span><strong id="maxSingleLoss">-</strong></div>
       <div class="metric"><span>胜率</span><strong id="winRate">-</strong></div>
       <div class="metric"><span>交易次数</span><strong id="tradeCount">-</strong></div>
       <div class="metric"><span>收益回撤比</span><strong id="rdd">-</strong></div>
@@ -566,6 +567,7 @@ function fillMetrics(m) {
   document.getElementById('returnPct').textContent = `${Number(m.total_return_pct).toFixed(2)}%`;
   document.getElementById('returnPct').className = m.total_return_pct >= 0 ? 'pos' : 'neg';
   document.getElementById('drawdown').textContent = `${Number(m.max_drawdown_pct).toFixed(2)}%`;
+  document.getElementById('maxSingleLoss').textContent = `${Number(m.max_single_loss_pct || 0).toFixed(2)}%`;
   document.getElementById('winRate').textContent = `${Number(m.win_rate_pct).toFixed(2)}%`;
   document.getElementById('tradeCount').textContent = m.trade_count;
   document.getElementById('rdd').textContent = Number(m.return_drawdown_ratio).toFixed(2);

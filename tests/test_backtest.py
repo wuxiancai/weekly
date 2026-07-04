@@ -43,6 +43,8 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("收益率", HTML)
         self.assertIn("盈亏比", HTML)
         self.assertIn("最大单笔回撤", HTML)
+        self.assertIn("单笔最大亏损率", HTML)
+        self.assertIn('id="maxSingleLoss"', HTML)
         self.assertIn("最大回撤", HTML)
         self.assertIn("收益回撤比", HTML)
 
@@ -168,10 +170,15 @@ class BacktestTests(unittest.TestCase):
 
         self.assertTrue(result["trades"])
         self.assertIn("max_trade_drawdown_pct", result["metrics"])
+        self.assertIn("max_single_loss_pct", result["metrics"])
         self.assertIn("equity_max_drawdown_pct", result["metrics"])
         self.assertEqual(
             result["metrics"]["max_trade_drawdown_pct"],
             max(trade["max_drawdown_pct"] for trade in result["trades"]),
+        )
+        self.assertEqual(
+            result["metrics"]["max_single_loss_pct"],
+            abs(min(trade["pnl_pct"] for trade in result["trades"])),
         )
         self.assertEqual(result["metrics"]["max_drawdown_pct"], result["metrics"]["max_trade_drawdown_pct"])
 
