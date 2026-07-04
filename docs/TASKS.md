@@ -17,5 +17,6 @@
 - [x] 建立 BTCUSDT / ETHUSDT `1d/4h/1h` 实盘模拟运行态，默认共享 `1000 USDT` 模拟账户。
 - [x] 增加 BTCUSDT / ETHUSDT `1h` 独立回测周期默认参数。
 - [x] 新增 `/paper` 模拟交易状态页和 `/api/paper/status`。
-- [x] 新增 `scripts/deploy_one_click.sh` 一键部署脚本，安装 Web 与 Paper runner 两个 systemd 服务。
+- [x] 新增 `scripts/deploy_one_click.sh` 一键部署脚本。
+- [x] 调整部署和启动为单入口：云服务器 systemd 只启动 `./start.sh`，由 `start.sh` 统一停止旧进程并启动 Web 回测系统与 Paper 模拟交易系统。
 - [ ] 增加资金费率、强平价、杠杆保证金模型。

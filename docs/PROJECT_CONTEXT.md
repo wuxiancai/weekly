@@ -39,6 +39,8 @@
 - 已新增实盘模拟 / Paper Trading 运行态：默认一个共享 `1000 USDT` 模拟账户，同时运行 `BTCUSDT / 1d`、`BTCUSDT / 4h`、`BTCUSDT / 1h`、`ETHUSDT / 1d`、`ETHUSDT / 4h`、`ETHUSDT / 1h` 独立策略；只使用 Binance USDⓈ-M Futures 行情，不提交真实订单。
 - 模拟交易后台使用 REST 轮询已收盘 K 线，首次启动只预热指标并定位最新已收盘 K 线，避免把历史信号误当成实时成交；后续每根 K 线只处理一次，状态写入 SQLite。
 - Web 新增 `/paper` 状态页，展示模拟账户资金、当前持仓、策略处理进度、最近平仓和运行日志。
+- 根目录 `./start.sh` 是统一运行入口：先停止本项目旧 Web/Paper 进程，再启动 FastAPI 回测系统和 Paper runner；云服务器 systemd 服务也只调用该入口。
+- Paper runner 会按策略指标周期自动计算预热 K 线数量，环境变量 `PAPER_WARMUP_CANDLES` 与策略需求取较大值，且不少于 60 根 K 线。
 
 ## 重要原则
 

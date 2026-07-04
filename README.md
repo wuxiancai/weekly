@@ -8,6 +8,8 @@
 ./start.sh
 ```
 
+`./start.sh` 会统一启动 Web 回测系统和 Paper 模拟交易系统。启动前会先停止本项目已存在的 Web/Paper 进程，避免重复运行。
+
 打开：
 
 ```text

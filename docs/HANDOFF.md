@@ -520,6 +520,18 @@
 - `/api/paper/status` 新增 `trade_records`，按 `paper_trades.id DESC` 返回完整模拟交易记录；原 `trades` 仍保留最近 20 条，用于 `最近平仓`。
 - 页面新增 `交易记录` 区块并放在 `最近平仓` 上方，默认容器高度约显示 5 条记录，超过部分在该模块内部滚动。
 
+## 2026-07-04 start.sh 统一启动 Web 与 Paper
+
+- 用户明确要求云服务器部署成功后执行 `./scripts/start.sh` / 根目录 `./start.sh`，所有服务都通过 `start.sh` 启动。
+- 根目录 `start.sh` 已改为统一编排入口：
+  - 创建/使用 `.venv` 并安装依赖。
+  - 启动前用本项目 `.venv` 路径匹配并停止旧 `uvicorn app.main:app` 与 `app.paper_runner` 进程，避免重复启动。
+  - 后台启动 `app.paper_runner`，日志写入 `runtime/logs/paper_runner.log`。
+  - 同时启动 FastAPI Web/回测系统，监听 `0.0.0.0`；脚本监控 Web 与 Paper，任一子进程退出都会清理另一个并退出，交给 systemd 重启。
+- `scripts/deploy_one_click.sh` 已改为只安装/重启 `weekly-web` 一个 systemd 服务，`ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh`；如果服务器残留旧 `weekly-paper` 服务，会停止、禁用并删除，避免双 runner。
+- `app/paper_runner.py` 的预热 K 线数量改为动态计算：`PAPER_WARMUP_CANDLES`、策略指标周期需求、固定下限 60 取最大值。比如某周期使用 `EMA15/MA50`，至少从执行 `start.sh` 的时间往前拉取 60 根该周期已收盘 K 线。
+- Paper 初次启动仍只预热并把最新已收盘 K 线标记为已处理，不会把历史信号立即模拟成交；后续新 K 线收盘才增量处理。
+
 ## 启动
 
 ```bash
