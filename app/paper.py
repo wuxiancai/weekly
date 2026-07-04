@@ -457,6 +457,7 @@ class PaperEngine:
         trade_records = [dict(row) for row in self.conn.execute("SELECT * FROM paper_trades ORDER BY id DESC")]
         events = [dict(row) for row in self.conn.execute("SELECT * FROM paper_events ORDER BY id DESC LIMIT 20")]
         curves = [dict(row) for row in self.conn.execute("SELECT * FROM paper_equity_curve ORDER BY open_time DESC LIMIT 50")]
+        positions = [_enrich_position(row) for row in positions]
         for row in strategies:
             row["params"] = json.loads(row.pop("params_json"))
         for row in events:
@@ -689,3 +690,43 @@ class PaperEngine:
 
 def _now_ms() -> int:
     return int(time.time() * 1000)
+
+
+def _enrich_position(row: dict[str, Any]) -> dict[str, Any]:
+    row["initial_take_price"] = _initial_take_price(row)
+    row["latest_take_price"] = row["take_price"]
+    row["liquidation_price"] = _liquidation_price(row)
+    return row
+
+
+def _initial_take_price(row: dict[str, Any]) -> float | None:
+    entry_price = _finite_float(row.get("entry_price"))
+    atr = _finite_float(row.get("atr"))
+    take_atr_start = _finite_float(row.get("take_atr_start"))
+    if entry_price is None or atr is None or take_atr_start is None or atr <= 0 or take_atr_start <= 0:
+        return _finite_float(row.get("take_price"))
+    if row.get("side") == "SHORT":
+        return entry_price - take_atr_start * atr
+    return entry_price + take_atr_start * atr
+
+
+def _liquidation_price(row: dict[str, Any]) -> float | None:
+    entry_price = _finite_float(row.get("entry_price"))
+    quantity = _finite_float(row.get("quantity"))
+    entry_margin = _finite_float(row.get("entry_margin"))
+    if entry_price is None or quantity is None or entry_margin is None or quantity <= 0 or entry_margin <= 0:
+        return None
+    margin_per_unit = entry_margin / quantity
+    if row.get("side") == "SHORT":
+        return entry_price + margin_per_unit
+    return max(0.0, entry_price - margin_per_unit)
+
+
+def _finite_float(value: Any) -> float | None:
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    if result != result:
+        return None
+    return result

@@ -684,6 +684,21 @@ chmod +x start.sh scripts/diagnose_runtime.sh
   - `python3 -m py_compile app/*.py` 通过。
   - `python3 -m unittest discover -s tests -v`：42 个测试通过。
 
+## 2026-07-05 Paper 当前持仓保证金、强平价和动态止盈展示
+
+- 上一节提到的 `当前持仓` 表格 `金额(USDT)` 确认为 `paper_positions.entry_margin`，即当前系统开仓时占用的保证金，因此页面列名改为 `保证金`。
+- `当前持仓` 在截图空红框位置新增 `强平价格` 列，位于 `入场价` 后、`数量` 前。
+- 当前强平价是简化估算：`LONG = max(0, entry_price - entry_margin / quantity)`，`SHORT = entry_price + entry_margin / quantity`。该字段用于页面运行态提示，尚未引入 Binance 维护保证金、资金费率或真实强平阶梯模型。
+- 策略当前使用动态阶梯止盈：`take_atr_step > 0` 且 `take_atr_max > take_atr_start` 时，价格达到初始止盈后会激活保护并更新 `take_price`。
+- 页面保留 `保护/止盈` 列显示开仓时的初始止盈价，并在其后新增 `最新止盈`，显示当前动态更新后的 `paper_positions.take_price`。
+- `/api/paper/status` 会为持仓补充：
+  - `initial_take_price`
+  - `latest_take_price`
+  - `liquidation_price`
+- 验证：
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：43 个测试通过。
+
 ## 下一步建议
 
 1. 在页面点击“同步 Binance 数据”确认 2019-09-02 到 2026-06-29 的周线入库。

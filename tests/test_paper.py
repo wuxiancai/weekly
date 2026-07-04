@@ -113,6 +113,55 @@ class PaperTradingTests(unittest.TestCase):
         self.assertEqual(len(status["trade_records"]), 25)
         self.assertGreater(status["trade_records"][0]["id"], status["trade_records"][-1]["id"])
 
+    def test_paper_status_enriches_positions_with_initial_take_and_liquidation_price(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        init_paper_schema(conn)
+        engine = PaperEngine(conn)
+        engine.initialize()
+        conn.execute(
+            """
+            INSERT INTO paper_positions(
+                symbol, interval, side, signal_time, entry_time, entry_price, quantity,
+                stop_price, take_price, entry_equity, atr, take_atr_start, take_atr_step,
+                take_atr_max, take_atr_buffer_pct, take_profit_armed, entry_margin,
+                risk_amount, max_adverse_pct, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "ETHUSDT",
+                "4h",
+                "LONG",
+                1000,
+                2000,
+                100.0,
+                2.0,
+                90.0,
+                124.0,
+                999.0,
+                4.0,
+                5.0,
+                1.0,
+                12.0,
+                0.0,
+                1,
+                80.0,
+                20.0,
+                0.0,
+                3000,
+                3000,
+            ),
+        )
+        conn.commit()
+
+        status = engine.status()
+
+        position = status["positions"][0]
+        self.assertEqual(position["initial_take_price"], 120.0)
+        self.assertEqual(position["latest_take_price"], 124.0)
+        self.assertEqual(position["liquidation_price"], 60.0)
+
     def test_process_closed_candles_is_idempotent_for_same_candle(self) -> None:
         conn = sqlite3.connect(":memory:")
         conn.row_factory = sqlite3.Row
@@ -166,8 +215,12 @@ class PaperTradingTests(unittest.TestCase):
 
     def test_paper_page_shows_intervals_amounts_and_formatted_log_times(self) -> None:
         self.assertIn("<th>交易对</th><th>周期</th><th>方向</th>", PAPER_HTML)
-        self.assertIn("<th>数量</th><th>金额(USDT)</th>", PAPER_HTML)
+        self.assertIn("<th>入场价</th><th>强平价格</th><th>数量</th><th>保证金</th>", PAPER_HTML)
+        self.assertIn("<th>止损</th><th>保护/止盈</th><th>最新止盈</th>", PAPER_HTML)
         self.assertIn("formatAmount(p.entry_margin)", PAPER_HTML)
+        self.assertIn("formatPrice(p.liquidation_price)", PAPER_HTML)
+        self.assertIn("formatPrice(p.initial_take_price)", PAPER_HTML)
+        self.assertIn("formatPrice(p.latest_take_price)", PAPER_HTML)
         self.assertIn("symbolClass(value)", PAPER_HTML)
         self.assertIn("intervalClass(value)", PAPER_HTML)
         self.assertIn("function symbolCell(value)", PAPER_HTML)
