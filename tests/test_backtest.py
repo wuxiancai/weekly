@@ -43,6 +43,8 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("收益率", HTML)
         self.assertIn("盈亏比", HTML)
         self.assertIn("最大单笔回撤", HTML)
+        self.assertIn("单笔最大亏损率", HTML)
+        self.assertIn('id="maxSingleLoss"', HTML)
         self.assertIn("最大回撤", HTML)
         self.assertIn("收益回撤比", HTML)
 
@@ -62,11 +64,14 @@ class BacktestTests(unittest.TestCase):
         self.assertIn('<option value="1w" selected>1w</option>', HTML)
         self.assertIn('<option value="1d">1d</option>', HTML)
         self.assertIn('<option value="4h">4h</option>', HTML)
+        self.assertIn('<option value="1h">1h</option>', HTML)
         self.assertIn('<option value="4h">4h</option>', ETH_HTML)
+        self.assertIn('<option value="1h">1h</option>', ETH_HTML)
         self.assertIn("const STRATEGY_DEFAULTS = {", HTML)
         self.assertIn("BTCUSDT: {", HTML)
         self.assertIn("ETHUSDT: {", HTML)
         self.assertIn("'4h': {", HTML)
+        self.assertIn("'1h': {", HTML)
         self.assertIn("ema: 8, ma: 40", HTML)
         self.assertIn("leverage: 0", HTML)
         self.assertIn("stopAtr: 1.6, takeAtr: 13.0, takeAtrStep: 0.75, takeAtrMax: 18.0", HTML)
@@ -75,9 +80,16 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("adx: 25, longRsiMin: 50, longRsiMax: 80", HTML)
         self.assertIn("stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8.0", HTML)
         self.assertIn("stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8,", HTML)
+        self.assertIn("ema: 12, ma: 35", HTML)
+        self.assertIn("adx: 18, longRsiMin: 55, longRsiMax: 85", HTML)
+        self.assertIn("stopAtr: 0.45, takeAtr: 4.0, takeAtrStep: 1.0, takeAtrMax: 12.0", HTML)
+        self.assertIn("rangeAdxMax: 22, rangeBbWidthMax: 0.05, rangeRsiLow: 35, rangeRsiHigh: 65", HTML)
+        self.assertIn("ema: 15, ma: 50", HTML)
+        self.assertIn("stopAtr: 0.45, takeAtr: 1.8, takeAtrStep: 0.5, takeAtrMax: 4", HTML)
+        self.assertIn("rangeAdxMax: 22, rangeBbWidthMax: 0.12, rangeRsiLow: 30, rangeRsiHigh: 65", HTML)
         self.assertIn("regimeSwitch: true", HTML)
         self.assertIn("rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 30, rangeRsiHigh: 65", HTML)
-        self.assertGreaterEqual(HTML.count("regimeSwitch: true, trendMaGapMin: 0.0"), 2)
+        self.assertGreaterEqual(HTML.count("regimeSwitch: true, trendMaGapMin: 0.0"), 4)
         self.assertIn("takeAtr: 6.5", HTML)
         self.assertIn("takeAtrMax: 24", HTML)
         self.assertIn("takeAtrMax: 32", HTML)
@@ -158,10 +170,15 @@ class BacktestTests(unittest.TestCase):
 
         self.assertTrue(result["trades"])
         self.assertIn("max_trade_drawdown_pct", result["metrics"])
+        self.assertIn("max_single_loss_pct", result["metrics"])
         self.assertIn("equity_max_drawdown_pct", result["metrics"])
         self.assertEqual(
             result["metrics"]["max_trade_drawdown_pct"],
             max(trade["max_drawdown_pct"] for trade in result["trades"]),
+        )
+        self.assertEqual(
+            result["metrics"]["max_single_loss_pct"],
+            abs(min(trade["pnl_pct"] for trade in result["trades"])),
         )
         self.assertEqual(result["metrics"]["max_drawdown_pct"], result["metrics"]["max_trade_drawdown_pct"])
 

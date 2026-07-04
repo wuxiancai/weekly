@@ -32,12 +32,19 @@
 - 参数搜索反推更高收益率的指标组合。
 - Web 页面展示图表、指标、回测、优化结果和交易明细。
 - 首页为 BTCUSDT 周线回测；右上角 `ETH 回测` 进入 ETHUSDT 日线回测页面，功能和排版与首页一致。
-- BTCUSDT / ETHUSDT 的 `1w`、`1d`、`4h` 默认参数按交易对和周期独立配置；页面切换周期时自动套用对应默认值，避免不同周期互相影响。
+- BTCUSDT / ETHUSDT 的 `1w`、`1d`、`4h`、`1h` 默认参数按交易对和周期独立配置；页面切换周期时自动套用对应默认值，避免不同周期互相影响。
 - BTCUSDT 日线默认参数已单独优化为无杠杆、复利、最大单笔回撤 50% 内收益优先组合；不影响已固化的 BTCUSDT 周线默认策略。
 - BTCUSDT 与 ETHUSDT 的 `4h` 已启用状态切换策略：趋势市使用 EMA/MA 顺势策略，震荡市使用布林带 + RSI 均值回归，过渡市空仓或少交易；两个交易对的 4h 默认参数相互独立。
-- 已新增实盘模拟 / Paper Trading 运行态：默认一个共享 `1000 USDT` 模拟账户，同时运行 `BTCUSDT / 1d`、`BTCUSDT / 4h`、`ETHUSDT / 1d`、`ETHUSDT / 4h` 独立策略；只使用 Binance USDⓈ-M Futures 行情，不提交真实订单。
+- BTCUSDT 与 ETHUSDT 的 `1h` 已按本地 `2019-09-02 -> 2026-06-29` 历史数据独立优化默认参数；两个交易对 1h 默认值相互独立，也不复用 4h 默认参数。
+- 已新增实盘模拟 / Paper Trading 运行态：默认一个共享 `1000 USDT` 模拟账户，同时运行 `BTCUSDT / 1w`、`BTCUSDT / 1d`、`BTCUSDT / 4h`、`BTCUSDT / 1h`、`ETHUSDT / 1w`、`ETHUSDT / 1d`、`ETHUSDT / 4h`、`ETHUSDT / 1h` 独立策略；只使用 Binance USDⓈ-M Futures 行情，不提交真实订单。
 - 模拟交易后台使用 REST 轮询已收盘 K 线，首次启动只预热指标并定位最新已收盘 K 线，避免把历史信号误当成实时成交；后续每根 K 线只处理一次，状态写入 SQLite。
 - Web 新增 `/paper` 状态页，展示模拟账户资金、当前持仓、策略处理进度、最近平仓和运行日志。
+- 根目录 `./start.sh` 是统一运行入口：先停止本项目旧 Web/Paper 进程，再启动 FastAPI 回测系统和 Paper runner；在 Ubuntu/systemd 环境手动执行会安装/更新并重启 `weekly-web`，该服务调用 `./start.sh --foreground` 托管同一套启动逻辑；非 systemd 环境才用 `nohup` 后台运行并写入 `runtime/start.pid` 与 `runtime/logs/start.log`。
+- `./start.sh` 的启动顺序必须是：先停止旧 `weekly-web` / 旧 `weekly-paper` systemd 服务和本项目遗留 Python 进程；再检查目标端口是否被其他项目占用，被其他项目占用才顺延；最后通过 systemd 启动本项目 Web 回测和 Paper 模拟交易。
+- `./start.sh --foreground` 是 systemd 内部托管模式，Web 和 Paper 输出分别写入 `runtime/logs/web.log` 与 `runtime/logs/paper_runner.log`，避免手动终端出现 `Press CTRL+C to quit` 的前台 uvicorn 误导。
+- 项目只保留根目录 `./start.sh` 作为启动入口，不再保留 `scripts/start.sh` 包装脚本，避免用户误执行旧入口；运行态可通过 `/api/system/runtime` 查看当前 PID、cwd、git commit 和 Paper 页面标记。
+- Web 默认端口为 `8001`；如果端口被本项目进程占用，`start.sh` 会先终止旧进程并复用该端口；如果被其他应用占用，则自动顺延到下一个可用端口。
+- Paper runner 会按策略指标周期自动计算预热 K 线数量，环境变量 `PAPER_WARMUP_CANDLES` 与策略需求取较大值，且不少于 60 根 K 线。
 
 ## 重要原则
 
@@ -50,4 +57,4 @@
 - 真实交易前必须另行接入账户权限、风控审核、异常熔断和人工确认，本项目默认只做模拟。
 - 实盘模拟不需要 Binance API Key，不具备真实下单能力；如果以后接入真实交易，必须新增独立权限、风控、强平/保证金模型和人工确认。
 - 周线默认策略参数已按最终截图固化，后续不再继续调整默认参数。
-- 不同周期策略按独立模块看待；周线、日线、4h 参数或逻辑调整不应隐式改变其他周期默认参数。
+- 不同周期策略按独立模块看待；周线、日线、4h、1h 参数或逻辑调整不应隐式改变其他周期默认参数。

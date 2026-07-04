@@ -9,12 +9,14 @@ from .paper import PaperEngine, init_paper_schema, paper_strategy_defaults
 
 
 INTERVAL_MS = {
+    "1h": 60 * 60 * 1000,
     "4h": 4 * 60 * 60 * 1000,
     "1d": 24 * 60 * 60 * 1000,
     "1w": 7 * 24 * 60 * 60 * 1000,
 }
 
 WARMUP_CANDLES = int(os.getenv("PAPER_WARMUP_CANDLES", "500"))
+MIN_WARMUP_CANDLES = 60
 POLL_SECONDS = int(os.getenv("PAPER_POLL_SECONDS", "60"))
 
 
@@ -28,7 +30,8 @@ def run_once() -> list[dict]:
         engine.initialize()
         for strategy in paper_strategy_defaults():
             try:
-                rows = _fetch_closed_warmup(client, strategy.symbol, strategy.interval)
+                warmup_candles = _warmup_candles_for(strategy.params)
+                rows = _fetch_closed_warmup(client, strategy.symbol, strategy.interval, warmup_candles)
                 stored = upsert_candles(rows)
                 latest_open_time = rows[-1]["open_time"] if rows else None
                 strategy_row = conn.execute(
@@ -42,17 +45,19 @@ def run_once() -> list[dict]:
                         "interval": strategy.interval,
                         "stored": stored,
                         "primed": primed,
+                        "warmup_candles": warmup_candles,
                         "processed": 0,
                         "opened": 0,
                         "closed": 0,
                     }
                 else:
-                    candles = load_candles(strategy.symbol, strategy.interval, _warmup_start_ms(strategy.interval), int(time.time() * 1000))
+                    candles = load_candles(strategy.symbol, strategy.interval, _warmup_start_ms(strategy.interval, warmup_candles), int(time.time() * 1000))
                     processed = engine.process_strategy(strategy.symbol, strategy.interval, candles)
                     result = {
                         "symbol": strategy.symbol,
                         "interval": strategy.interval,
                         "stored": stored,
+                        "warmup_candles": warmup_candles,
                         "latest_open_time": latest_open_time,
                         "processed": processed.processed,
                         "opened": processed.opened,
@@ -74,15 +79,28 @@ def run_forever() -> None:
         time.sleep(POLL_SECONDS)
 
 
-def _fetch_closed_warmup(client: BinanceClient, symbol: str, interval: str) -> list[dict]:
+def _fetch_closed_warmup(client: BinanceClient, symbol: str, interval: str, warmup_candles: int) -> list[dict]:
     now_ms = int(time.time() * 1000)
-    rows = client.fetch_klines_ms(symbol, interval, _warmup_start_ms(interval), now_ms)
+    rows = client.fetch_klines_ms(symbol, interval, _warmup_start_ms(interval, warmup_candles), now_ms)
     return [row for row in rows if int(row["close_time"]) < now_ms]
 
 
-def _warmup_start_ms(interval: str) -> int:
+def _warmup_start_ms(interval: str, warmup_candles: int) -> int:
     now_ms = int(time.time() * 1000)
-    return now_ms - INTERVAL_MS[interval] * WARMUP_CANDLES
+    return now_ms - INTERVAL_MS[interval] * warmup_candles
+
+
+def _warmup_candles_for(params: object) -> int:
+    indicator_periods = [
+        int(getattr(params, "ema_period", 0) or 0),
+        int(getattr(params, "ma_period", 0) or 0),
+        int(getattr(params, "rsi_period", 0) or 0),
+        int(getattr(params, "atr_period", 0) or 0),
+        int(getattr(params, "adx_period", 0) or 0),
+        26,
+        20,
+    ]
+    return max(WARMUP_CANDLES, MIN_WARMUP_CANDLES, max(indicator_periods) + 10)
 
 
 if __name__ == "__main__":

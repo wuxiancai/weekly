@@ -296,6 +296,19 @@
   - `ETHUSDT / 1d`：复用 ETH 日线默认 `EMA15 / MA40`、`ADX >= 0`、多头 RSI `35-85`、止损 `1.8 ATR`、动态止盈启动 `6.5 ATR`、阶梯 `1.25`、上限 `24`、量能 `1`。
   - `ETHUSDT / 4h`：保留状态切换默认策略。
 - `/paper` 状态页顶部改为展示策略周期 `1d / 4h`。
+
+## 2026-07-04 增加 1h 独立周期策略
+
+- 用户要求根据 `1d`、`4h` 的交易策略模块和回测模块逻辑，增加 BTCUSDT / ETHUSDT 的 `1h` 独立交易和回测模块。
+- Web 页面更新：
+  - `周期` 下拉新增 `1h`。
+  - `STRATEGY_DEFAULTS.BTCUSDT['1h']` 与 `STRATEGY_DEFAULTS.ETHUSDT['1h']` 已新增独立配置。
+  - `1h` 第一版采用盘中状态切换策略：`EMA8 / MA35`、`ADX >= 25`、趋势/震荡/过渡状态切换、震荡 RSI `30/65`、止损 `0.8 ATR`、动态止盈启动 `3.5 ATR`、阶梯 `0.5`、上限 `8`、无杠杆、复利。
+- Paper Trading 更新：
+  - 默认策略池扩展为六个：`BTCUSDT / 1d`、`BTCUSDT / 4h`、`BTCUSDT / 1h`、`ETHUSDT / 1d`、`ETHUSDT / 4h`、`ETHUSDT / 1h`。
+  - `app.paper_runner.INTERVAL_MS` 新增 `1h`，后台会按已收盘 1h K 线增量处理。
+  - `/paper` 状态页顶部策略周期改为 `1d / 4h / 1h`。
+- 注意：当前 `1h` 参数是独立默认槽位的初始版本，尚未基于本地 1h 历史数据单独优化。
 - 页面 `周期` 下拉已新增 `4h`。
 - `STRATEGY_DEFAULTS` 已新增独立 4h 默认参数：
   - `BTCUSDT / 4h`：当前先复制 `BTCUSDT / 1d` 默认参数，`EMA8 / MA40`、无杠杆、复利、止损 `1.6 ATR`、动态止盈启动 `13 ATR`、止盈阶梯 `0.75 ATR`、止盈上限 `18 ATR`、量能 `0.75`。
@@ -401,6 +414,124 @@
 - 对照：仅在 ETH 旧 4h 参数上打开状态策略但保留 `ADX >= 0` 时结果不变，因为所有 K 线都会被判定为 `TREND`，震荡分支不会生效。
 - 该修改只影响 `ETHUSDT / 4h`，不改变 ETH 日线、ETH 周线或 BTC 任一周期默认策略。
 
+## 2026-07-04 1h 参数优化与默认值同步
+
+- 用户要求先提交端口修改，再执行 1h 策略优化，找出收益率最高、胜率最高组合；一旦发现最优参数就写为默认。
+- 端口提交已完成：`7c0886f Set deploy default port to 8001`。
+- 已同步本地 Binance Futures 1h 数据：
+  - `BTCUSDT 1h`：`59648` 根，实际数据 `2019-09-08` 至 `2026-06-29`。
+  - `ETHUSDT 1h`：`57738` 根，实际数据 `2019-11-27` 至 `2026-06-29`。
+- 本轮优化口径：`2019-09-02 -> 2026-06-29`，本金 `10000`，复利 `YES`，杠杆 `0`，手续费 `0.0005`，滑点 `0.0005`。
+- `BTCUSDT / 1h` 已写入收益最高/综合评分第一默认参数：
+  - `EMA12 / MA35`
+  - `ADX >= 18`
+  - 多头 RSI `55-85`，空头 RSI `0-100`
+  - 止损 `0.45 ATR`
+  - 动态止盈启动 `4.0 ATR`
+  - 止盈阶梯 `1.0 ATR`
+  - 止盈上限 `12 ATR`
+  - `volume_mult = 1.25`
+  - `regimeSwitch = YES`
+  - `trend_ma_gap_min = 0`
+  - `range_adx_max = 22`
+  - `range_bb_width_max = 0.05`
+  - `range_rsi_low = 35`
+  - `range_rsi_high = 65`
+- BTC 该默认回测结果：
+  - 最终资金 `1135530.27 USDT`
+  - 总收益率 `11255.30%`
+  - 最大单笔回撤 `9.19%`
+  - 周期权益曲线最大回撤 `25.47%`
+  - 交易 `3290` 笔
+  - 胜率 `17.36%`
+  - 盈利因子 `1.3347`
+- BTC 胜率最高候选：`EMA15/MA50, ADX>=35, stop_atr=1.5, take_atr=1.8, volume_mult=1.25`，胜率 `43.97%`，收益率 `716.77%`。当前默认仍按用户目标采用收益最高组合。
+- `ETHUSDT / 1h` 已写入收益最高/综合评分第一默认参数：
+  - `EMA15 / MA50`
+  - `ADX >= 25`
+  - 多头 RSI `50-80`，空头 RSI `0-100`
+  - 止损 `0.45 ATR`
+  - 动态止盈启动 `1.8 ATR`
+  - 止盈阶梯 `0.5 ATR`
+  - 止盈上限 `4 ATR`
+  - `volume_mult = 1`
+  - `regimeSwitch = YES`
+  - `trend_ma_gap_min = 0`
+  - `range_adx_max = 22`
+  - `range_bb_width_max = 0.12`
+  - `range_rsi_low = 30`
+  - `range_rsi_high = 65`
+- ETH 该默认回测结果：
+  - 最终资金 `44505509.77 USDT`
+  - 总收益率 `444955.10%`
+  - 最大单笔回撤 `7.34%`
+  - 周期权益曲线最大回撤 `40.91%`
+  - 交易 `3280` 笔
+  - 胜率 `23.87%`
+  - 盈利因子 `1.6648`
+- ETH 胜率最高候选：`EMA15/MA50, ADX>=35, stop_atr=1.5, take_atr=1.8, volume_mult=1.25`，胜率 `45.19%`，收益率 `2382.19%`。当前默认仍按用户目标采用收益最高组合。
+- Web `STRATEGY_DEFAULTS` 与 Paper Trading `paper_strategy_defaults()` 已同步上述 1h 参数；BTC/ETH 1h 不再共用 4h 默认参数对象。
+
+## 2026-07-04 1h 分段参数复验
+
+- 用户反馈 1h 默认参数不是不同短窗口的最优值，要求不要一次性长跑，而是按 `1个月 / 2个月 / 6个月` 分段回测，并列出高胜率、低单笔最大亏损率、高收益率、高盈亏比等多组参数。
+- 新增离线脚本 `scripts/optimize_1h_segmented.py`：
+  - 默认分段窗口：`1m=2026-06-02 -> 2026-06-29`、`2m=2026-05-01 -> 2026-06-29`、`6m=2026-01-02 -> 2026-06-29`。
+  - 每段先用 90 天预热筛选 864 组 1h 状态切换候选。
+  - 入围候选再用页面同口径全历史预热复验 `1m / 2m / 6m / full`。
+- 输出文件：
+  - `reports/1h_segmented/BTCUSDT_1h_*_raw.csv`
+  - `reports/1h_segmented_eth/ETHUSDT_1h_*_raw.csv`
+  - `reports/1h_segmented_validated/validated.csv`
+  - `reports/1h_segmented_recommendations.md`
+- BTCUSDT 当前默认仍是全历史收益最高候选之一：`1m 0.01% / 2m 1.54% / 6m 21.66% / full 11255.30%`，但短窗口表现弱。
+- BTCUSDT 三段稳健候选：`EMA8/MA35 ADX>=25 RSI55-85 SL0.45 TP4/1/12 VOL1.25 R22/0.12/30-65`，复验结果 `1m 14.32% / 2m 15.85% / 6m 54.71% / full 3277.98%`，6m 最大单笔回撤 `3.53%`、胜率 `20.21%`、盈利因子 `1.7711`。
+- BTCUSDT 高胜率候选：`EMA12/MA35 ADX>=35 RSI50-80 SL1.5 TP1.8/0.5/4 VOL1.25 R22/0.12/30-65`，6m 收益 `26.93%`、胜率 `44.44%`、最大单笔回撤 `3.80%`、盈利因子 `1.4821`。
+- ETHUSDT 当前默认仍是全历史收益最高候选之一：`1m 11.35% / 2m 9.32% / 6m 59.61% / full 444955.10%`。
+- ETHUSDT 6m 高收益候选：`EMA15/MA50 ADX>=25 RSI50-80 SL0.45 TP4/1/12 VOL1 R22/0.05/35-65`，复验结果 `1m 14.96% / 2m 12.33% / 6m 108.14% / full 203676.50%`，6m 最大单笔回撤 `4.34%`、胜率 `18.55%`、盈利因子 `1.7418`。
+- ETHUSDT 三段稳健候选：`EMA8/MA35 ADX>=35 RSI50-80 SL0.45 TP3.5/0.5/8 VOL1.25 R22/0.05/35-65`，复验结果 `1m 22.93% / 2m 21.91% / 6m 84.76% / full 17719.21%`，6m 最大单笔回撤 `4.34%`、胜率 `21.97%`、盈利因子 `2.2036`。
+- 本轮只整理候选和证据，未修改 Web / Paper 的 1h 默认参数；如要切默认，建议优先让用户在 `当前默认 / 三段稳健 / 高胜率` 中确认目标。
+
+## 2026-07-04 单笔最大亏损率指标
+
+- 用户要求在回测结果顶部指标卡增加 `单笔最大亏损率`。
+- 后端 metrics 使用 `max_single_loss_pct = abs(min(trade.pnl_pct))`，即逐笔交易中亏损率最大的一笔；若无亏损交易则为 `0`。
+- Web 顶部指标卡已在 `最大单笔回撤` 后展示 `单笔最大亏损率`，与现有 `最大单笔回撤` 口径区分：
+  - `最大单笔回撤`：持仓期间最大不利浮亏。
+  - `单笔最大亏损率`：最终平仓后最亏一笔的实现亏损率。
+
+## 2026-07-04 Paper 顶部实时行情与 UTC+8 时钟
+
+- 用户要求在 `/paper` 顶部标题与导航之间增加 BTC/ETH 永续合约实时行情和 UTC+8 实时读秒时间。
+- 新增 `/api/market/tickers`，通过 Binance USD-M Futures 当前价格和 UTC+0 当日 `1d` K 线开盘价计算 `BTCUSDT`、`ETHUSDT` 的当日涨跌额与涨跌率，返回口径标记为 `UTC+0`。
+- `/paper` 顶部新增单行紧凑状态条：
+  - 同一行显示 `BTC 永续`、`ETH 永续` 实时价格、UTC+0 当日涨跌额、UTC+0 当日涨跌率，以及转换后的 `UTC+8 YYYY-MM-DD HH:mm:ss`。
+  - 涨为绿色，跌为红色；前端每秒更新时间。
+- 行情刷新已改为实时推送：
+  - 页面先通过 `/api/market/tickers` 初始化 UTC+0 当日开盘价和当前价。
+  - 然后连接 Binance Futures WebSocket `btcusdt@bookTicker/ethusdt@bookTicker`，用买一卖一中间价实时更新 BTC/ETH 永续价格，并按 UTC+0 当日开盘价即时重算涨跌额和涨跌率。
+  - REST 行情接口保留为 60 秒一次的 UTC+0 基准价刷新与兜底，不再使用 10 秒轮询作为主行情源。
+  - WebSocket 断开后 3 秒自动重连；“刷新”按钮会同时刷新 Paper 状态和 REST 行情基准。若 Binance 行情连接失败，会在行情条直接显示 `行情连接失败`。
+- `/paper` 顶部 H1 已按用户在浏览器中选中的标题位置改为 `币安合约交易系统`。
+
+## 2026-07-04 Paper 交易记录模块
+
+- 用户要求在 `/paper` 的 `最近平仓` 上方新增 `交易记录` 显示模块。
+- `/api/paper/status` 新增 `trade_records`，按 `paper_trades.id DESC` 返回完整模拟交易记录；原 `trades` 仍保留最近 20 条，用于 `最近平仓`。
+- 页面新增 `交易记录` 区块并放在 `最近平仓` 上方，默认容器高度约显示 5 条记录，超过部分在该模块内部滚动。
+
+## 2026-07-04 start.sh 统一启动 Web 与 Paper
+
+- 用户明确要求云服务器部署成功后执行 `./scripts/start.sh` / 根目录 `./start.sh`，所有服务都通过 `start.sh` 启动。
+- 根目录 `start.sh` 已改为统一编排入口：
+  - 创建/使用 `.venv` 并安装依赖。
+  - 启动前用本项目 `.venv` 路径匹配并停止旧 `uvicorn app.main:app` 与 `app.paper_runner` 进程，避免重复启动。
+  - 后台启动 `app.paper_runner`，日志写入 `runtime/logs/paper_runner.log`。
+  - 同时启动 FastAPI Web/回测系统，监听 `0.0.0.0`；脚本监控 Web 与 Paper，任一子进程退出都会清理另一个并退出，交给 systemd 重启。
+- `scripts/deploy_one_click.sh` 已改为只安装/重启 `weekly-web` 一个 systemd 服务，`ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh`；如果服务器残留旧 `weekly-paper` 服务，会停止、禁用并删除，避免双 runner。
+- `app/paper_runner.py` 的预热 K 线数量改为动态计算：`PAPER_WARMUP_CANDLES`、策略指标周期需求、固定下限 60 取最大值。比如某周期使用 `EMA15/MA50`，至少从执行 `start.sh` 的时间往前拉取 60 根该周期已收盘 K 线。
+- Paper 初次启动仍只预热并把最新已收盘 K 线标记为已处理，不会把历史信号立即模拟成交；后续新 K 线收盘才增量处理。
+
 ## 启动
 
 ```bash
@@ -410,8 +541,134 @@
 默认访问：
 
 ```text
-http://127.0.0.1:8000
+http://127.0.0.1:8001
 ```
+
+## 2026-07-04 Web 默认端口与占用处理
+
+- Web 默认端口已从 `8000` 改为 `8001`，`start.sh`、`scripts/deploy_one_click.sh`、`scripts/install_systemd_service.sh` 保持一致。
+- `start.sh` 端口处理规则：
+  - 如果候选端口被本项目进程占用，直接终止旧进程并复用该端口重新启动。
+  - 如果候选端口被其他应用占用，自动顺延到下一个端口，例如 `8002`、`8003`。
+  - 默认最多从起始端口向后检查 50 个端口。
+
+## 2026-07-04 Paper 增加 1w 并动态展示策略周期
+
+- 用户截图显示 `/paper` 顶部策略周期仍是 `1d / 4h`，询问 `1w`、`1h` 是否没有模拟交易。
+- 核对代码后结论：
+  - `1h` 已经在本地代码中纳入 Paper Trading，截图对应远端页面是旧版本或服务未重启。
+  - `1w` 周线此前确实没有加入 Paper Trading 默认策略池。
+- `app/paper.py` 已将默认策略池扩展为 8 个：
+  - `BTCUSDT / 1w`
+  - `BTCUSDT / 1d`
+  - `BTCUSDT / 4h`
+  - `BTCUSDT / 1h`
+  - `ETHUSDT / 1w`
+  - `ETHUSDT / 1d`
+  - `ETHUSDT / 4h`
+  - `ETHUSDT / 1h`
+- `1w` 使用已固化周线默认参数：`EMA15 / MA40`、`ADX >= 0`、多头 RSI `35-85`、空头 RSI `0-100`、止损 `1.8 ATR`、动态止盈启动 `7.5 ATR`、阶梯 `1.25 ATR`、上限 `32 ATR`、`volume_mult = 1`。
+- `/paper` 顶部“策略周期”改为从 `/api/paper/status` 的已启用策略动态计算，按 `1w / 1d / 4h / 1h` 顺序展示，不再写死。
+- 验证：
+  - 目标测试红灯确认旧行为缺 `1w` 且页面硬编码。
+  - 修改后目标测试通过：`test_paper_defaults_use_shared_1000_usdt_account_and_all_strategy_intervals`、`test_paper_engine_initializes_account_and_strategies_once`、`test_paper_page_derives_strategy_intervals_from_status`。
+
+## 2026-07-04 start.sh 手动后台启动修正
+
+- 用户指出：终端执行 `start.sh` 后不能关闭终端肯定不行；同时再次强调 `start.sh` 必须启动一切。
+- 根因：此前 `start.sh` 只有前台 supervisor 行为，适合 systemd 托管，但不适合 SSH 手动执行后关闭终端。
+- 修改：
+  - `./start.sh` 在 Ubuntu/systemd 环境默认安装/更新并重启 `weekly-web`，该服务执行 `./start.sh --foreground`；非 systemd 环境才用 `nohup` 后台启动同一个 supervisor，写入 `runtime/start.pid`，日志写入 `runtime/logs/start.log`。
+  - `./start.sh --foreground` 前台启动同一个 supervisor，供 systemd 托管。
+  - `scripts/deploy_one_click.sh` 的 systemd `ExecStart` 已改为 `/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground`。
+  - Web 和 Paper runner 仍由根目录 `start.sh` 统一启动、监控和清理，没有恢复独立 `weekly-paper` 服务。
+- 手动启动：
+
+```bash
+./start.sh
+```
+
+- systemd 托管启动：
+
+```bash
+sudo systemctl restart weekly-web
+```
+
+- 手动停止：
+
+```bash
+kill $(cat runtime/start.pid)
+```
+
+## 2026-07-04 start.sh 处理旧 systemd 双轨部署
+
+- 用户贴出的服务器日志显示：
+  - 手动执行 `bash scripts/start.sh` 启动的是旧前台 Web 进程，监听 `8002`，输出 `停止: Ctrl+C`。
+  - `Ctrl+C` 后 `8002` 不再监听。
+  - 但 `systemctl status weekly-web` 仍 active，因为旧 `weekly-web` 服务直接运行 `uvicorn app.main:app` 并监听 `8001`。
+  - `weekly-paper` 旧独立服务仍 active。
+- 根因：服务器还处在旧部署形态，存在三条启动路径：
+  - 手动前台 `scripts/start.sh` 临时进程。
+  - 旧 `weekly-web` 直接 `uvicorn`。
+  - 旧 `weekly-paper` 直接 `app.paper_runner`。
+- 修改：
+  - 根目录 `start.sh` 默认模式在 systemd 环境下不再起临时 `8002` 进程，而是写入/更新 `weekly-web.service`，`ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground`，然后 `systemctl restart weekly-web`。
+  - 根目录 `start.sh` 会停止、禁用并删除旧 `weekly-paper.service`。
+  - 根目录 `start.sh` 会先 `systemctl stop weekly-web`，再清理本项目遗留 Python 进程，避免旧 service 自动重启抢占端口。
+  - `--foreground` 模式里的 Web 输出已写入 `runtime/logs/web.log`，不再直接把 uvicorn 的 `Press CTRL+C to quit` 打到手动终端。
+  - `scripts/deploy_one_click.sh` 复用根目录 `start.sh` 做 systemd 安装和重启，避免两套 unit 写法漂移。
+  - 非 systemd 环境保留 `nohup "$0" --foreground` fallback。
+- 服务器更新到此版本后，执行：
+
+```bash
+./start.sh
+```
+
+- 诊断当前 Web 进程实际运行版本：
+
+```bash
+curl -s http://127.0.0.1:8001/api/system/runtime
+```
+
+- 如果返回里 `paper_html_markers.hardcoded_old_intervals=true`，或页面标题仍是旧 `BTCUSDT / ETHUSDT U本位永续合约模拟交易`，说明当前浏览器访问的 Web 进程不是最新代码。
+
+## 2026-07-04 删除 scripts/start.sh 并增加运行态版本诊断
+
+- 用户已删除 `scripts/start.sh`，要求默认只使用项目根目录 `start.sh`。
+- 仓库同步该决定：
+  - 删除 `scripts/start.sh`。
+  - `scripts/deploy_one_click.sh` 不再 chmod 或引用 `scripts/start.sh`。
+  - 测试新增约束：`scripts/start.sh` 不应存在。
+- 新增 `/api/system/runtime`：
+  - 返回 `pid`、`cwd`、`app_version`、`git_commit`、`start_mode`。
+  - 返回 Paper HTML 标记：是否使用动态策略周期、是否使用新标题、是否仍含旧硬编码周期。
+- `start.sh` 会把当前 `git rev-parse --short HEAD` 写入 `APP_VERSION`，systemd unit 也会带上该环境变量。
+- 用途：以后出现“端口有监听但页面还是旧”的情况，先查 `/api/system/runtime`，确认服务实际运行 commit 和页面标记。
+
+## 2026-07-04 8002 残留旧进程与 Paper 页面旧版本诊断
+
+- 用户重新部署后反馈 `8001` 和 `8002` 都能访问，且 `/paper` 页面仍显示旧标题 `BTCUSDT / ETHUSDT U本位永续合约模拟交易` 和策略周期 `1d / 4h`。
+- 本地当前代码结论：
+  - `PAPER_HTML` 不再硬编码 `1d / 4h`，而是通过 `id="strategyIntervals"` 从 `/api/paper/status` 返回的启用策略动态计算。
+  - `paper_strategy_defaults()` 当前应初始化 8 个策略：`BTCUSDT/ETHUSDT` 各 `1w / 1d / 4h / 1h`。
+  - 因此截图中的旧标题和 `1d / 4h` 不是当前代码渲染结果，而是远端仍有旧 Web 进程或旧代码实例在提供页面。
+- 本次修正：
+  - `start.sh` 的旧进程清理范围从本项目 `.venv` 下的 `uvicorn` / `app.paper_runner` 扩展到本项目根目录 `start.sh` 和旧 `scripts/start.sh` supervisor，避免旧 `8002` shell supervisor 残留。
+  - 新增 `scripts/diagnose_runtime.sh`，用于在服务器上同时检查 `8001/8002` 的监听进程、`/api/system/runtime` 返回 commit、以及 `/paper` HTML 是否仍是旧硬编码标题/周期。
+- 服务器更新到此版本后建议执行：
+
+```bash
+git pull
+chmod +x start.sh scripts/diagnose_runtime.sh
+./start.sh
+./scripts/diagnose_runtime.sh
+```
+
+- 预期结果：
+  - 只有 `8001` 是本项目服务；如果 `8002` 仍监听，诊断脚本会显示它的 PID 和运行版本。
+  - `/api/system/runtime.paper_html_markers.hardcoded_old_intervals=false`。
+  - `/api/system/runtime.paper_html_markers.dynamic_strategy_intervals=true`。
+  - `/api/paper/status` 的 `strategies` 应包含 8 条策略。
 
 ## 下一步建议
 

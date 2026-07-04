@@ -68,6 +68,46 @@ class BinanceClient:
                 break
         return [row for row in rows if start_ms <= row["open_time"] <= end_ms]
 
+    def fetch_24hr_tickers(self, symbols: list[str]) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for symbol in symbols:
+            response = requests.get(
+                f"{self.base_url}/fapi/v1/ticker/24hr",
+                params={"symbol": symbol.upper()},
+                timeout=10,
+            )
+            response.raise_for_status()
+            rows.append(response.json())
+        return rows
+
+    def fetch_utc_day_tickers(self, symbols: list[str]) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for symbol in symbols:
+            symbol = symbol.upper()
+            price_response = requests.get(
+                f"{self.base_url}/fapi/v1/ticker/price",
+                params={"symbol": symbol},
+                timeout=10,
+            )
+            price_response.raise_for_status()
+            kline_response = requests.get(
+                f"{self.base_url}/fapi/v1/klines",
+                params={"symbol": symbol, "interval": "1d", "limit": 1},
+                timeout=10,
+            )
+            kline_response.raise_for_status()
+            price_payload = price_response.json()
+            kline = kline_response.json()[0]
+            rows.append(
+                {
+                    "symbol": symbol,
+                    "lastPrice": price_payload["price"],
+                    "utcOpenPrice": kline[1],
+                    "eventTime": int(price_payload.get("time") or kline[6]),
+                }
+            )
+        return rows
+
     def _get_klines(self, symbol: str, interval: str, start_ms: int, end_ms: int, limit: int) -> list[list[Any]]:
         response = requests.get(
             f"{self.base_url}/fapi/v1/klines",

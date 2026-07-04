@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import subprocess
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
@@ -71,6 +73,65 @@ def paper_status() -> dict[str, Any]:
         init_paper_schema(conn)
         engine = PaperEngine(conn)
         return engine.status()
+
+
+@app.get("/api/market/tickers")
+def market_tickers() -> dict[str, Any]:
+    symbols = ["BTCUSDT", "ETHUSDT"]
+    try:
+        rows = BinanceClient().fetch_utc_day_tickers(symbols)
+    except Exception as exc:
+        raise HTTPException(502, f"Binance 行情连接失败：{exc}") from exc
+    by_symbol = {str(row.get("symbol", "")).upper(): row for row in rows}
+    items = []
+    for symbol in symbols:
+        row = by_symbol.get(symbol)
+        if row is None:
+            continue
+        price = float(row["lastPrice"])
+        utc_open_price = float(row["utcOpenPrice"])
+        change = price - utc_open_price
+        items.append(
+            {
+                "symbol": symbol,
+                "price": round(price, 4),
+                "utc_open_price": round(utc_open_price, 4),
+                "change": round(change, 4),
+                "change_pct": round(change / utc_open_price * 100, 4) if utc_open_price else 0.0,
+                "event_time": int(row.get("eventTime") or 0),
+            }
+        )
+    return {"timezone": "UTC+0", "items": items}
+
+
+@app.get("/api/system/runtime")
+def system_runtime() -> dict[str, Any]:
+    git_commit = os.getenv("APP_VERSION") or _git_commit()
+    return {
+        "pid": os.getpid(),
+        "cwd": os.getcwd(),
+        "app_version": git_commit,
+        "git_commit": git_commit,
+        "start_mode": os.getenv("START_MODE", ""),
+        "paper_html_markers": {
+            "dynamic_strategy_intervals": 'id="strategyIntervals"' in PAPER_HTML,
+            "new_title": "<h1>币安合约交易系统</h1>" in PAPER_HTML,
+            "hardcoded_old_intervals": "<strong>1d / 4h</strong>" in PAPER_HTML
+            or "<strong>1d / 4h / 1h</strong>" in PAPER_HTML,
+        },
+    }
+
+
+def _git_commit() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=os.getcwd(),
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        return "unknown"
 
 
 @app.post("/api/sync")
@@ -261,7 +322,7 @@ HTML = """
     button { border:1px solid #3b4654; background:#202733; color:var(--text); border-radius:6px; padding:10px 12px; cursor:pointer; font-weight:650; min-height:38px; width:100%; }
     button.primary { background:#1b6b50; border-color:#27936f; }
     button:hover { filter:brightness(1.12); }
-    .grid { display:grid; grid-template-columns: repeat(6, 1fr); gap:0; overflow:hidden; }
+    .grid { display:grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap:0; overflow:hidden; }
     .metric { padding:13px; border-right:1px solid var(--line); }
     .metric:last-child { border-right:0; }
     .metric span { display:block; color:var(--muted); font-size:12px; margin-bottom:6px; }
@@ -294,7 +355,7 @@ HTML = """
   <main>
     <section class="toolbar">
       <label title="交易标的。推荐：BTCUSDT。此处固定按 Binance USDⓈ-M / U本位永续合约理解，不是币本位合约。">交易对<input id="symbol" value="BTCUSDT"></label>
-      <label title="K 线周期。推荐：周线 1w；切换到 1d/4h 时会自动套用当前交易对的独立周期默认参数。">周期<select id="interval" onchange="applyIntervalDefaults()"><option value="1w" selected>1w</option><option value="1d">1d</option><option value="4h">4h</option></select></label>
+      <label title="K 线周期。推荐：周线 1w；切换到 1d/4h/1h 时会自动套用当前交易对的独立周期默认参数。">周期<select id="interval" onchange="applyIntervalDefaults()"><option value="1w" selected>1w</option><option value="1d">1d</option><option value="4h">4h</option><option value="1h">1h</option></select></label>
       <label title="回测开始日期。推荐：2019-09-02；交易只从该日期后开始，指标可用之前历史预热。">开始日期<input id="start" value="2019-09-02"></label>
       <label title="回测结束日期。推荐：2026-06-29。">结束日期<input id="end" value="2026-06-29"></label>
       <label title="初始本金。复利=NO 时每笔按该固定本金开仓；复利=YES 时第一笔用该本金，之后按当前权益开仓。推荐：10000。">本金<input id="initialEquity" type="number" step="100" value="10000"></label>
@@ -318,8 +379,8 @@ HTML = """
       <label title="动态止盈最高 ATR 倍数上限。推荐：32。">止盈上限<input id="takeAtrMax" type="number" step="0.5" value="32"></label>
       <label title="动态止盈保护位缓冲比例。推荐：0。">止盈缓冲<input id="takeAtrBuffer" type="number" step="0.01" value="0"></label>
       <label title="成交量过滤倍数，当前量需大于成交量均线乘以该值。推荐：1。">量能倍数<input id="volumeMult" type="number" step="0.05" value="1"></label>
-      <label title="4h 状态切换策略。YES：先识别 TREND/RANGE/NEUTRAL，趋势市顺势，震荡市均值回归，过渡市少交易。推荐：4h YES，周线/日线 NO。">状态策略<select id="regimeSwitch"><option value="false" selected>NO</option><option value="true">YES</option></select></label>
-      <label title="趋势状态要求 EMA 与 MA 至少分离的比例。推荐：4h 0.006。">趋势间距<input id="trendMaGapMin" type="number" step="0.001" value="0.006"></label>
+      <label title="盘中状态切换策略。YES：先识别 TREND/RANGE/NEUTRAL，趋势市顺势，震荡市均值回归，过渡市少交易。推荐：1h/4h YES，周线/日线 NO。">状态策略<select id="regimeSwitch"><option value="false" selected>NO</option><option value="true">YES</option></select></label>
+      <label title="趋势状态要求 EMA 与 MA 至少分离的比例。推荐：1h/4h 0。">趋势间距<input id="trendMaGapMin" type="number" step="0.001" value="0.006"></label>
       <label title="震荡状态 ADX 上限。低于该值且布林带收窄时按震荡处理。推荐：18。">震荡ADX<input id="rangeAdxMax" type="number" step="1" value="18"></label>
       <label title="震荡状态布林带宽上限，(上轨-下轨)/中轨。推荐：0.08。">震荡带宽<input id="rangeBbWidthMax" type="number" step="0.005" value="0.08"></label>
       <label title="震荡策略做多 RSI 阈值。低于该值且接近布林下轨时做多。推荐：35。">震荡多RSI<input id="rangeRsiLow" type="number" value="35"></label>
@@ -333,6 +394,7 @@ HTML = """
       <div class="metric"><span>最终资金(USDT)</span><strong id="finalEquity">-</strong></div>
       <div class="metric"><span>总收益率</span><strong id="returnPct">-</strong></div>
       <div class="metric"><span>最大单笔回撤</span><strong id="drawdown">-</strong></div>
+      <div class="metric"><span>单笔最大亏损率</span><strong id="maxSingleLoss">-</strong></div>
       <div class="metric"><span>胜率</span><strong id="winRate">-</strong></div>
       <div class="metric"><span>交易次数</span><strong id="tradeCount">-</strong></div>
       <div class="metric"><span>收益回撤比</span><strong id="rdd">-</strong></div>
@@ -384,6 +446,13 @@ const STRATEGY_DEFAULTS = {
       adxPeriod: 14, adx: 25, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
       stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8.0, takeAtrBuffer: 0, volumeMult: 1.0,
       regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 30, rangeRsiHigh: 65
+    },
+    '1h': {
+      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 12, ma: 35, rsiPeriod: 14, atrPeriod: 14,
+      adxPeriod: 14, adx: 18, longRsiMin: 55, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 0.45, takeAtr: 4.0, takeAtrStep: 1.0, takeAtrMax: 12.0, takeAtrBuffer: 0, volumeMult: 1.25,
+      regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 22, rangeBbWidthMax: 0.05, rangeRsiLow: 35, rangeRsiHigh: 65
     }
   },
   ETHUSDT: {
@@ -407,6 +476,13 @@ const STRATEGY_DEFAULTS = {
       adxPeriod: 14, adx: 25, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
       stopAtr: 0.8, takeAtr: 3.5, takeAtrStep: 0.5, takeAtrMax: 8, takeAtrBuffer: 0, volumeMult: 1,
       regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 18, rangeBbWidthMax: 0.08, rangeRsiLow: 30, rangeRsiHigh: 65
+    },
+    '1h': {
+      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 15, ma: 50, rsiPeriod: 14, atrPeriod: 14,
+      adxPeriod: 14, adx: 25, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 0.45, takeAtr: 1.8, takeAtrStep: 0.5, takeAtrMax: 4, takeAtrBuffer: 0, volumeMult: 1,
+      regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 22, rangeBbWidthMax: 0.12, rangeRsiLow: 30, rangeRsiHigh: 65
     }
   }
 };
@@ -552,6 +628,7 @@ function fillMetrics(m) {
   document.getElementById('returnPct').textContent = `${Number(m.total_return_pct).toFixed(2)}%`;
   document.getElementById('returnPct').className = m.total_return_pct >= 0 ? 'pos' : 'neg';
   document.getElementById('drawdown').textContent = `${Number(m.max_drawdown_pct).toFixed(2)}%`;
+  document.getElementById('maxSingleLoss').textContent = `${Number(m.max_single_loss_pct || 0).toFixed(2)}%`;
   document.getElementById('winRate').textContent = `${Number(m.win_rate_pct).toFixed(2)}%`;
   document.getElementById('tradeCount').textContent = m.trade_count;
   document.getElementById('rdd').textContent = Number(m.return_drawdown_ratio).toFixed(2);
@@ -689,6 +766,12 @@ PAPER_HTML = """
     header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); background:#0c0e12; }
     h1 { margin:0; font-size:20px; }
     main { padding:18px; display:grid; gap:14px; }
+    .market-ticker { min-width:420px; flex:1; max-width:760px; border:1px solid var(--line); border-radius:8px; padding:8px 12px; background:#11151b; }
+    .ticker-row { display:flex; align-items:center; justify-content:center; gap:14px; min-height:22px; white-space:nowrap; font-weight:700; }
+    .ticker-item { display:inline-flex; align-items:baseline; gap:7px; }
+    .ticker-label, .clock-label { color:var(--muted); font-size:12px; }
+    .ticker-price { font-size:16px; }
+    .ticker-change, .clock-value { font-size:13px; }
     .nav { display:flex; gap:10px; align-items:center; }
     a, button { border:1px solid #3b4654; background:#202733; color:var(--text); border-radius:6px; padding:9px 12px; text-decoration:none; cursor:pointer; font-weight:650; }
     .grid { display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--panel); }
@@ -697,6 +780,7 @@ PAPER_HTML = """
     .metric span { display:block; color:var(--muted); font-size:12px; margin-bottom:7px; }
     .metric strong { font-size:22px; }
     .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; overflow:auto; }
+    .trade-records-scroll { max-height:214px; overflow-y:auto; border-bottom:1px solid var(--line); }
     table { width:100%; border-collapse:collapse; font-size:12px; }
     th, td { border-bottom:1px solid var(--line); padding:8px; text-align:right; white-space:nowrap; }
     th:first-child, td:first-child { text-align:left; }
@@ -704,16 +788,23 @@ PAPER_HTML = """
     .muted { color:var(--muted); }
     .pos { color:var(--green); }
     .neg { color:var(--red); }
-    @media (max-width: 900px) { .grid { grid-template-columns:repeat(2,1fr); } header { align-items:flex-start; flex-direction:column; gap:12px; } }
+    @media (max-width: 900px) { .grid { grid-template-columns:repeat(2,1fr); } header { align-items:stretch; flex-direction:column; gap:12px; } .market-ticker { min-width:0; max-width:none; width:100%; padding:8px 10px; } .ticker-row { justify-content:flex-start; gap:9px; overflow:auto; } .ticker-item { gap:4px; } .ticker-label, .clock-label { font-size:11px; } .ticker-price { font-size:14px; } .ticker-change, .clock-value { font-size:12px; } }
   </style>
 </head>
 <body>
   <header>
-    <h1>BTCUSDT / ETHUSDT U本位永续合约模拟交易</h1>
+    <h1>币安合约交易系统</h1>
+    <div class="market-ticker" id="marketTicker">
+      <div class="ticker-row">
+        <span class="ticker-item" id="tickerBtc"><span class="ticker-label">BTC 永续</span><span class="ticker-price">-</span><span class="ticker-change">-</span></span>
+        <span class="ticker-item" id="tickerEth"><span class="ticker-label">ETH 永续</span><span class="ticker-price">-</span><span class="ticker-change">-</span></span>
+        <span class="ticker-item"><span class="clock-label">UTC+8</span><span class="clock-value" id="utc8Clock">-</span></span>
+      </div>
+    </div>
     <div class="nav">
       <a href="/">BTC 回测</a>
       <a href="/eth">ETH 回测</a>
-      <button onclick="loadStatus()">刷新</button>
+      <button onclick="loadAll()">刷新</button>
     </div>
   </header>
   <main>
@@ -721,7 +812,7 @@ PAPER_HTML = """
       <div class="metric"><span>模拟账户资金(USDT)</span><strong id="equity">-</strong></div>
       <div class="metric"><span>初始资金(USDT)</span><strong id="initial">1000.00</strong></div>
       <div class="metric"><span>复利</span><strong id="compound">YES</strong></div>
-      <div class="metric"><span>策略周期</span><strong>1d / 4h</strong></div>
+      <div class="metric"><span>策略周期</span><strong id="strategyIntervals">-</strong></div>
     </section>
     <section class="panel">
       <h2>当前持仓</h2>
@@ -730,6 +821,12 @@ PAPER_HTML = """
     <section class="panel">
       <h2>策略状态</h2>
       <table><thead><tr><th>交易对</th><th>周期</th><th>启用</th><th>最后处理 K 线</th><th>参数</th></tr></thead><tbody id="strategies"></tbody></table>
+    </section>
+    <section class="panel">
+      <h2>交易记录</h2>
+      <div class="trade-records-scroll">
+        <table><thead><tr><th>交易对</th><th>方向</th><th>入场</th><th>出场</th><th>入场价</th><th>出场价</th><th>收益(USDT)</th><th>收益率</th><th>原因</th></tr></thead><tbody id="tradeRecords"></tbody></table>
+      </div>
     </section>
     <section class="panel">
       <h2>最近平仓</h2>
@@ -741,6 +838,10 @@ PAPER_HTML = """
     </section>
   </main>
 <script>
+let marketTickerSocket = null;
+let marketTickerReconnectTimer = null;
+const marketTickerState = {};
+
 async function loadStatus() {
   const res = await fetch('/api/paper/status');
   const data = await res.json();
@@ -748,13 +849,106 @@ async function loadStatus() {
   document.getElementById('equity').textContent = Number(account.equity || 0).toFixed(2);
   document.getElementById('initial').textContent = Number(account.initial_equity || 1000).toFixed(2);
   document.getElementById('compound').textContent = account.compound ? 'YES' : 'NO';
-  document.getElementById('leverage').textContent = Number(account.leverage || 0).toFixed(2);
+  updateStrategyIntervals(data.strategies || []);
   fillStrategies(data.strategies || []);
   fillPositions(data.positions || []);
+  fillTradeRecords(data.trade_records || data.trades || []);
   fillTrades(data.trades || []);
   fillEvents(data.events || []);
 }
+function loadAll() {
+  loadStatus();
+  return loadMarketTicker();
+}
+async function loadMarketTicker() {
+  try {
+    const res = await fetch('/api/market/tickers');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || '行情连接失败');
+    const bySymbol = Object.fromEntries((data.items || []).map(item => {
+      marketTickerState[item.symbol] = item;
+      return [item.symbol, item];
+    }));
+    fillTicker('tickerBtc', bySymbol.BTCUSDT);
+    fillTicker('tickerEth', bySymbol.ETHUSDT);
+  } catch (error) {
+    document.getElementById('tickerBtc').innerHTML = '<span class="ticker-label">BTC 永续</span><span class="ticker-change neg">行情连接失败</span>';
+    document.getElementById('tickerEth').innerHTML = '<span class="ticker-label">ETH 永续</span><span class="ticker-change neg">行情连接失败</span>';
+  }
+}
+function openMarketTickerStream() {
+  if (marketTickerSocket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(marketTickerSocket.readyState)) return;
+  if (marketTickerReconnectTimer) {
+    clearTimeout(marketTickerReconnectTimer);
+    marketTickerReconnectTimer = null;
+  }
+  const tickerEl = document.getElementById('marketTicker');
+  tickerEl.dataset.streamState = 'connecting';
+  marketTickerSocket = new WebSocket('wss://fstream.binance.com/stream?streams=btcusdt@bookTicker/ethusdt@bookTicker');
+  window.marketTickerSocket = marketTickerSocket;
+  marketTickerSocket.onopen = () => {
+    tickerEl.dataset.streamState = 'open';
+  };
+  marketTickerSocket.onmessage = event => {
+    const payload = JSON.parse(event.data);
+    const ticker = payload.data || payload;
+    const symbol = ticker.s;
+    if (!symbol) return;
+    const bid = Number(ticker.b);
+    const ask = Number(ticker.a);
+    const price = Number.isFinite(bid) && Number.isFinite(ask) ? (bid + ask) / 2 : Number(ticker.p || ticker.c);
+    if (!Number.isFinite(price)) return;
+    const previous = marketTickerState[symbol] || { symbol };
+    const utcOpen = Number(previous.utc_open_price || 0);
+    const change = price - utcOpen;
+    const item = {
+      ...previous,
+      symbol,
+      price,
+      change,
+      change_pct: utcOpen ? change / utcOpen * 100 : 0,
+      event_time: Number(ticker.E || Date.now()),
+    };
+    marketTickerState[symbol] = item;
+    tickerEl.dataset.streamUpdates = String(Number(tickerEl.dataset.streamUpdates || 0) + 1);
+    fillTicker(symbol === 'BTCUSDT' ? 'tickerBtc' : 'tickerEth', item);
+  };
+  marketTickerSocket.onclose = () => {
+    tickerEl.dataset.streamState = 'closed';
+    marketTickerReconnectTimer = setTimeout(openMarketTickerStream, 3000);
+  };
+  marketTickerSocket.onerror = () => {
+    tickerEl.dataset.streamState = 'error';
+    marketTickerSocket.close();
+  };
+}
+function fillTicker(id, item) {
+  const el = document.getElementById(id);
+  if (!item) {
+    el.innerHTML = '<span class="ticker-label">永续</span><span class="ticker-change neg">暂无行情</span>';
+    return;
+  }
+  const label = item.symbol === 'BTCUSDT' ? 'BTC 永续' : 'ETH 永续';
+  const change = Number(item.change_pct || 0);
+  const changeAmount = Number(item.change || 0);
+  const cls = change >= 0 ? 'pos' : 'neg';
+  const sign = change >= 0 ? '+' : '';
+  el.innerHTML = `<span class="ticker-label">${label}</span><span class="ticker-price ${cls}">${Number(item.price).toFixed(2)}</span><span class="ticker-change ${cls}">${sign}${changeAmount.toFixed(2)}</span><span class="ticker-change ${cls}">${sign}${change.toFixed(2)}%</span>`;
+}
+function updateUtc8Clock() {
+  const now = new Date();
+  const utc8 = new Date(now.getTime() + (now.getTimezoneOffset() + 480) * 60000);
+  const pad = value => String(value).padStart(2, '0');
+  const text = `${utc8.getFullYear()}-${pad(utc8.getMonth() + 1)}-${pad(utc8.getDate())} ${pad(utc8.getHours())}:${pad(utc8.getMinutes())}:${pad(utc8.getSeconds())}`;
+  document.getElementById('utc8Clock').textContent = text;
+}
 function date(ms) { return ms ? new Date(Number(ms)).toLocaleString() : '-'; }
+function updateStrategyIntervals(strategies) {
+  const intervalOrder = ['1w', '1d', '4h', '1h'];
+  const active = new Set(strategies.filter(s => s.enabled).map(s => s.interval));
+  const ordered = intervalOrder.filter(interval => active.has(interval));
+  document.getElementById('strategyIntervals').textContent = ordered.length ? ordered.join(' / ') : '-';
+}
 function fillStrategies(items) {
   document.getElementById('strategies').innerHTML = items.map(s => `
     <tr><td>${s.symbol}</td><td>${s.interval}</td><td>${s.enabled ? 'YES' : 'NO'}</td><td>${date(s.last_processed_open_time)}</td><td class="muted">${summary(s.params)}</td></tr>
@@ -765,10 +959,14 @@ function fillPositions(items) {
     <tr><td>${p.symbol}</td><td>${p.interval}</td><td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${date(p.entry_time)}</td><td>${Number(p.entry_price).toFixed(2)}</td><td>${Number(p.quantity).toFixed(6)}</td><td>${Number(p.stop_price).toFixed(2)}</td><td>${Number(p.take_price).toFixed(2)}</td></tr>
   `).join('') || '<tr><td colspan="8" class="muted">暂无持仓</td></tr>';
 }
+function tradeRow(t) {
+  return `<tr><td>${t.symbol}</td><td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td><td>${date(t.entry_time)}</td><td>${date(t.exit_time)}</td><td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td><td>${Number(t.pnl_pct).toFixed(2)}%</td><td>${t.exit_reason}</td></tr>`;
+}
+function fillTradeRecords(items) {
+  document.getElementById('tradeRecords').innerHTML = items.map(tradeRow).join('') || '<tr><td colspan="9" class="muted">暂无交易记录</td></tr>';
+}
 function fillTrades(items) {
-  document.getElementById('trades').innerHTML = items.map(t => `
-    <tr><td>${t.symbol}</td><td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td><td>${date(t.entry_time)}</td><td>${date(t.exit_time)}</td><td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td><td>${Number(t.pnl_pct).toFixed(2)}%</td><td>${t.exit_reason}</td></tr>
-  `).join('') || '<tr><td colspan="9" class="muted">暂无平仓记录</td></tr>';
+  document.getElementById('trades').innerHTML = items.map(tradeRow).join('') || '<tr><td colspan="9" class="muted">暂无平仓记录</td></tr>';
 }
 function fillEvents(items) {
   document.getElementById('events').innerHTML = items.map(e => `
@@ -778,7 +976,12 @@ function fillEvents(items) {
 function summary(p) {
   return `EMA${p.ema_period}/MA${p.ma_period}, ADX${p.adx_min}, RSI ${p.long_rsi_min}-${p.long_rsi_max}, SL${p.stop_atr}, TP${p.take_atr}, Step${p.take_atr_step}, Max${p.take_atr_max}, Regime ${p.regime_switch ? 'YES' : 'NO'}`;
 }
-document.addEventListener('DOMContentLoaded', loadStatus);
+document.addEventListener('DOMContentLoaded', () => {
+  loadAll().finally(() => openMarketTickerStream());
+  updateUtc8Clock();
+  setInterval(updateUtc8Clock, 1000);
+  setInterval(loadMarketTicker, 60000);
+});
 </script>
 </body>
 </html>
@@ -797,7 +1000,7 @@ ETH_HTML = (
     .replace("const PAGE_SYMBOL = 'BTCUSDT';", "const PAGE_SYMBOL = 'ETHUSDT';")
     .replace("const PAGE_INTERVAL = '1w';", "const PAGE_INTERVAL = '1d';")
     .replace("周期 1w", "周期 1d")
-    .replace('<option value="1w" selected>1w</option><option value="1d">1d</option><option value="4h">4h</option>', '<option value="1w">1w</option><option value="1d" selected>1d</option><option value="4h">4h</option>')
+    .replace('<option value="1w" selected>1w</option><option value="1d">1d</option><option value="4h">4h</option><option value="1h">1h</option>', '<option value="1w">1w</option><option value="1d" selected>1d</option><option value="4h">4h</option><option value="1h">1h</option>')
     .replace("动态止盈启动 ATR 倍数。推荐：7.5", "动态止盈启动 ATR 倍数。推荐：6.5")
     .replace('id="takeAtr" type="number" step="0.1" value="7.5"', 'id="takeAtr" type="number" step="0.1" value="6.5"')
     .replace("动态止盈最高 ATR 倍数上限。推荐：32", "动态止盈最高 ATR 倍数上限。推荐：24")

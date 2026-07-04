@@ -41,6 +41,7 @@ class ProcessResult:
 
 
 def paper_strategy_defaults() -> list[PaperStrategyConfig]:
+    weekly = _weekly_params()
     btc_daily = StrategyParams(
         ema_period=8,
         ma_period=40,
@@ -79,7 +80,50 @@ def paper_strategy_defaults() -> list[PaperStrategyConfig]:
         volume_mult=1.0,
         regime_switch=False,
     )
-    four_hour = StrategyParams(
+    four_hour = _intraday_regime_params()
+    btc_one_hour = _btc_one_hour_params()
+    eth_one_hour = _eth_one_hour_params()
+    return [
+        PaperStrategyConfig("BTCUSDT", "1w", weekly),
+        PaperStrategyConfig("BTCUSDT", "1d", btc_daily),
+        PaperStrategyConfig("BTCUSDT", "4h", four_hour),
+        PaperStrategyConfig("BTCUSDT", "1h", btc_one_hour),
+        PaperStrategyConfig("ETHUSDT", "1w", weekly),
+        PaperStrategyConfig("ETHUSDT", "1d", eth_daily),
+        PaperStrategyConfig("ETHUSDT", "4h", four_hour),
+        PaperStrategyConfig("ETHUSDT", "1h", eth_one_hour),
+    ]
+
+
+def _weekly_params() -> StrategyParams:
+    return StrategyParams(
+        ema_period=15,
+        ma_period=40,
+        rsi_period=14,
+        atr_period=14,
+        adx_period=14,
+        adx_min=0,
+        long_rsi_min=35,
+        long_rsi_max=85,
+        short_rsi_min=0,
+        short_rsi_max=100,
+        stop_atr=1.8,
+        take_atr=7.5,
+        take_atr_step=1.25,
+        take_atr_max=32.0,
+        take_atr_buffer_pct=0.0,
+        volume_mult=1.0,
+        regime_switch=False,
+        trend_ma_gap_min=0.006,
+        range_adx_max=18,
+        range_bb_width_max=0.08,
+        range_rsi_low=35,
+        range_rsi_high=65,
+    )
+
+
+def _intraday_regime_params() -> StrategyParams:
+    return StrategyParams(
         ema_period=8,
         ma_period=35,
         rsi_period=14,
@@ -103,12 +147,60 @@ def paper_strategy_defaults() -> list[PaperStrategyConfig]:
         range_rsi_low=30,
         range_rsi_high=65,
     )
-    return [
-        PaperStrategyConfig("BTCUSDT", "1d", btc_daily),
-        PaperStrategyConfig("BTCUSDT", "4h", four_hour),
-        PaperStrategyConfig("ETHUSDT", "1d", eth_daily),
-        PaperStrategyConfig("ETHUSDT", "4h", four_hour),
-    ]
+
+
+def _btc_one_hour_params() -> StrategyParams:
+    return StrategyParams(
+        ema_period=12,
+        ma_period=35,
+        rsi_period=14,
+        atr_period=14,
+        adx_period=14,
+        adx_min=18,
+        long_rsi_min=55,
+        long_rsi_max=85,
+        short_rsi_min=0,
+        short_rsi_max=100,
+        stop_atr=0.45,
+        take_atr=4.0,
+        take_atr_step=1.0,
+        take_atr_max=12.0,
+        take_atr_buffer_pct=0.0,
+        volume_mult=1.25,
+        regime_switch=True,
+        trend_ma_gap_min=0.0,
+        range_adx_max=22,
+        range_bb_width_max=0.05,
+        range_rsi_low=35,
+        range_rsi_high=65,
+    )
+
+
+def _eth_one_hour_params() -> StrategyParams:
+    return StrategyParams(
+        ema_period=15,
+        ma_period=50,
+        rsi_period=14,
+        atr_period=14,
+        adx_period=14,
+        adx_min=25,
+        long_rsi_min=50,
+        long_rsi_max=80,
+        short_rsi_min=0,
+        short_rsi_max=100,
+        stop_atr=0.45,
+        take_atr=1.8,
+        take_atr_step=0.5,
+        take_atr_max=4.0,
+        take_atr_buffer_pct=0.0,
+        volume_mult=1.0,
+        regime_switch=True,
+        trend_ma_gap_min=0.0,
+        range_adx_max=22,
+        range_bb_width_max=0.12,
+        range_rsi_low=30,
+        range_rsi_high=65,
+    )
 
 
 def init_paper_schema(conn: Any) -> None:
@@ -362,6 +454,7 @@ class PaperEngine:
         strategies = [dict(row) for row in self.conn.execute("SELECT * FROM paper_strategies ORDER BY symbol, interval")]
         positions = [dict(row) for row in self.conn.execute("SELECT * FROM paper_positions ORDER BY symbol, interval")]
         trades = [dict(row) for row in self.conn.execute("SELECT * FROM paper_trades ORDER BY id DESC LIMIT 20")]
+        trade_records = [dict(row) for row in self.conn.execute("SELECT * FROM paper_trades ORDER BY id DESC")]
         events = [dict(row) for row in self.conn.execute("SELECT * FROM paper_events ORDER BY id DESC LIMIT 20")]
         curves = [dict(row) for row in self.conn.execute("SELECT * FROM paper_equity_curve ORDER BY open_time DESC LIMIT 50")]
         for row in strategies:
@@ -372,6 +465,7 @@ class PaperEngine:
             "account": account,
             "strategies": strategies,
             "positions": positions,
+            "trade_records": trade_records,
             "trades": trades,
             "events": events,
             "equity_curve": list(reversed(curves)),

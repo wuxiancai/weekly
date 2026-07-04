@@ -5,10 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 WEB_SERVICE="${WEB_SERVICE:-weekly-web}"
-PAPER_SERVICE="${PAPER_SERVICE:-weekly-paper}"
+LEGACY_PAPER_SERVICE="${LEGACY_PAPER_SERVICE:-weekly-paper}"
 SERVICE_USER="${SERVICE_USER:-$(whoami)}"
 HOST="${HOST:-0.0.0.0}"
-PORT="${PORT:-8000}"
+PORT="${PORT:-8001}"
 PAPER_POLL_SECONDS="${PAPER_POLL_SECONDS:-60}"
 
 if ! command -v systemctl >/dev/null 2>&1; then
@@ -42,54 +42,18 @@ fi
 "$VENV_PYTHON" -m pip install --upgrade pip
 "$VENV_PYTHON" -m pip install -r requirements.txt
 
-chmod +x "$ROOT_DIR/start.sh" "$ROOT_DIR/scripts/start.sh" "$ROOT_DIR/scripts/run_paper.sh"
+chmod +x "$ROOT_DIR/start.sh" "$ROOT_DIR/scripts/run_paper.sh"
 
-sudo tee "/etc/systemd/system/${WEB_SERVICE}.service" >/dev/null <<SERVICE
-[Unit]
-Description=Weekly BTCUSDT/ETHUSDT backtest web
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=${SERVICE_USER}
-WorkingDirectory=${ROOT_DIR}
-Environment=HOST=${HOST}
-Environment=PORT=${PORT}
-ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
-
-sudo tee "/etc/systemd/system/${PAPER_SERVICE}.service" >/dev/null <<SERVICE
-[Unit]
-Description=Weekly BTCUSDT/ETHUSDT paper trading runner
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=${SERVICE_USER}
-WorkingDirectory=${ROOT_DIR}
-Environment=PAPER_POLL_SECONDS=${PAPER_POLL_SECONDS}
-ExecStart=/usr/bin/env bash ${ROOT_DIR}/scripts/run_paper.sh
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
-
-sudo systemctl daemon-reload
-sudo systemctl enable "${WEB_SERVICE}.service" "${PAPER_SERVICE}.service"
-sudo systemctl restart "${WEB_SERVICE}.service" "${PAPER_SERVICE}.service"
+WEB_SERVICE="$WEB_SERVICE" \
+LEGACY_PAPER_SERVICE="$LEGACY_PAPER_SERVICE" \
+SERVICE_USER="$SERVICE_USER" \
+HOST="$HOST" \
+PORT="$PORT" \
+PAPER_POLL_SECONDS="$PAPER_POLL_SECONDS" \
+"$ROOT_DIR/start.sh"
 
 echo "部署完成"
 echo "Web: http://服务器IP:${PORT}"
 echo "模拟交易状态页: http://服务器IP:${PORT}/paper"
-echo "查看 Web 日志: sudo journalctl -u ${WEB_SERVICE} -f"
-echo "查看模拟交易日志: sudo journalctl -u ${PAPER_SERVICE} -f"
-sudo systemctl --no-pager --full status "${WEB_SERVICE}.service" "${PAPER_SERVICE}.service"
+echo "所有服务由 start.sh 统一启动；查看日志: sudo journalctl -u ${WEB_SERVICE} -f"
+sudo systemctl --no-pager --full status "${WEB_SERVICE}.service"

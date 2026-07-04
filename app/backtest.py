@@ -126,6 +126,7 @@ def run_backtest(
     gross_loss = abs(sum(t["pnl"] for t in losses))
     equity_drawdown_pct = max_drawdown * 100
     max_trade_drawdown_pct = max((float(t["max_drawdown_pct"]) for t in trades), default=0.0)
+    max_single_loss_pct = abs(min((float(t["pnl_pct"]) for t in trades), default=0.0))
     metrics = {
         "initial_equity": round(initial_equity, 4),
         "final_equity": round(equity, 4),
@@ -134,6 +135,7 @@ def run_backtest(
         "total_return_pct": round((equity / initial_equity - 1) * 100, 4) if initial_equity else 0.0,
         "max_drawdown_pct": round(max_trade_drawdown_pct, 4),
         "max_trade_drawdown_pct": round(max_trade_drawdown_pct, 4),
+        "max_single_loss_pct": round(max_single_loss_pct, 4),
         "equity_max_drawdown_pct": round(equity_drawdown_pct, 4),
         "trade_count": len(trades),
         "win_rate_pct": round(len(wins) / len(trades) * 100, 4) if trades else 0.0,
