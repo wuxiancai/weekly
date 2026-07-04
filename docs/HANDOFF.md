@@ -670,6 +670,20 @@ chmod +x start.sh scripts/diagnose_runtime.sh
   - `/api/system/runtime.paper_html_markers.dynamic_strategy_intervals=true`。
   - `/api/paper/status` 的 `strategies` 应包含 8 条策略。
 
+## 2026-07-05 Paper 页面列与时间显示更新
+
+- `/paper` 的 `交易记录` 和 `最近平仓` 表格在 `交易对` 后新增 `周期` 列，直接显示 `1w / 1d / 4h / 1h`。
+- `/paper` 的 `当前持仓` 表格在 `数量` 后新增 `金额(USDT)`，使用 `paper_positions.entry_margin` 展示本次开仓使用的 USDT 金额。
+- `BTCUSDT` 在 Paper 页面表格中统一显示为蓝色；周期颜色统一为：
+  - `1w` 蓝色
+  - `1d` 红色
+  - `4h` 紫色
+  - `1h` 黄色
+- 运行日志首列时间改为固定 `YYYY-MM-DD HH:mm:ss` 格式；日志内容 payload 中的 `*_time` 和 `event_time` 字段也会转成标准时间，避免继续显示类似 `783036800000` 的毫秒时间戳。
+- 验证：
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：42 个测试通过。
+
 ## 下一步建议
 
 1. 在页面点击“同步 Binance 数据”确认 2019-09-02 到 2026-06-29 的周线入库。

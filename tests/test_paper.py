@@ -164,6 +164,23 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("fillTradeRecords(data.trade_records || data.trades || []);", PAPER_HTML)
         self.assertIn("function fillTradeRecords(items)", PAPER_HTML)
 
+    def test_paper_page_shows_intervals_amounts_and_formatted_log_times(self) -> None:
+        self.assertIn("<th>交易对</th><th>周期</th><th>方向</th>", PAPER_HTML)
+        self.assertIn("<th>数量</th><th>金额(USDT)</th>", PAPER_HTML)
+        self.assertIn("formatAmount(p.entry_margin)", PAPER_HTML)
+        self.assertIn("symbolClass(value)", PAPER_HTML)
+        self.assertIn("intervalClass(value)", PAPER_HTML)
+        self.assertIn("function symbolCell(value)", PAPER_HTML)
+        self.assertIn("function intervalCell(value)", PAPER_HTML)
+        self.assertIn("function formatDateTime(ms)", PAPER_HTML)
+        self.assertIn("function formatPayload(payload)", PAPER_HTML)
+        self.assertIn("entry_time", PAPER_HTML)
+        self.assertIn("event_time", PAPER_HTML)
+        self.assertIn("interval-1w", PAPER_HTML)
+        self.assertIn("interval-1d", PAPER_HTML)
+        self.assertIn("interval-4h", PAPER_HTML)
+        self.assertIn("interval-1h", PAPER_HTML)
+
     def test_paper_page_derives_strategy_intervals_from_status(self) -> None:
         self.assertIn('id="strategyIntervals"', PAPER_HTML)
         self.assertIn("updateStrategyIntervals(data.strategies || []);", PAPER_HTML)
