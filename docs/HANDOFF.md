@@ -699,6 +699,32 @@ chmod +x start.sh scripts/diagnose_runtime.sh
   - `python3 -m py_compile app/*.py` 通过。
   - `python3 -m unittest discover -s tests -v`：43 个测试通过。
 
+## 2026-07-05 Paper 收益率盈亏颜色更新
+
+- `/paper` 的 `交易记录` 和 `最近平仓` 共用同一个 `tradeRow()` 渲染函数。
+- 已将两张表里的 `收益率` 单元格改为按 `pnl_pct >= 0` 加 `pos`，否则加 `neg`，与 `收益(USDT)` 的红亏绿赢显示保持一致。
+- 新增回归测试覆盖该 HTML 模板，避免后续再漏掉收益率颜色。
+- 验证：
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：44 个测试通过。
+
+## 2026-07-05 Paper 资金使用率配置与参数悬停说明
+
+- `/paper` 顶部指标条在原红框位置新增 `资金使用率(%)` 设置：
+  - 默认交易对比例：`BTCUSDT=80%`、`ETHUSDT=20%`。
+  - 默认周期比例：`1h=30%`、`4h=40%`、`1d=20%`、`1w=10%`。
+- 新增 SQLite 表 `paper_capital_allocations`，保存 `symbol` 和 `interval` 两类资金比例。
+- `/api/paper/status` 返回 `capital_allocation`，包含 symbols、intervals 和每个 `symbol + interval` 槽位的 allocated / used / available margin。
+- 新增 `/api/paper/capital-allocation`，页面点击 `保存资金` 后写入配置。
+- 开仓逻辑改为按槽位可用额度开仓：`account.equity * symbol_pct * interval_pct`，再扣除该槽位已有持仓的 `entry_margin`。
+- 已有持仓不会因为配置变更被强制缩仓；如果新配置下仍有空闲额度，后续开仓立即按新配置；如果槽位已被占满，则平仓释放保证金后新配置自然生效。
+- `策略状态` 的 `参数` 列改为带 hover title 的参数摘要，悬停显示 EMA/MA、ADX、RSI、SL、TP、Step、Max、Regime 的含义和调大/调小影响。
+- 验证：
+  - TDD 红灯确认：新增资金分配和 hover 测试在实现前失败。
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：48 个测试通过。
+  - Playwright 打开 `http://127.0.0.1:8765/paper`，快照确认顶部显示 BTC/ETH/1h/4h/1d/1w 输入框，默认值为 `80/20/30/40/20/10`；唯一 console error 是 `favicon.ico` 404。
+
 ## 下一步建议
 
 1. 在页面点击“同步 Binance 数据”确认 2019-09-02 到 2026-06-29 的周线入库。

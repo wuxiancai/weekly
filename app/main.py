@@ -44,6 +44,11 @@ class BacktestRequest(BaseModel):
     params: dict[str, Any] = {}
 
 
+class CapitalAllocationRequest(BaseModel):
+    symbols: dict[str, float]
+    intervals: dict[str, float]
+
+
 @app.on_event("startup")
 def startup() -> None:
     init_db()
@@ -73,6 +78,19 @@ def paper_status() -> dict[str, Any]:
         init_paper_schema(conn)
         engine = PaperEngine(conn)
         return engine.status()
+
+
+@app.post("/api/paper/capital-allocation")
+def update_paper_capital_allocation(request: CapitalAllocationRequest) -> dict[str, Any]:
+    with connect() as conn:
+        init_paper_schema(conn)
+        engine = PaperEngine(conn)
+        engine.initialize()
+        try:
+            engine.update_capital_allocation(request.symbols, request.intervals)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return engine.status()["capital_allocation"]
 
 
 @app.get("/api/market/tickers")
@@ -774,11 +792,15 @@ PAPER_HTML = """
     .ticker-change, .clock-value { font-size:13px; }
     .nav { display:flex; gap:10px; align-items:center; }
     a, button { border:1px solid #3b4654; background:#202733; color:var(--text); border-radius:6px; padding:9px 12px; text-decoration:none; cursor:pointer; font-weight:650; }
-    .grid { display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--panel); }
+    .grid { display:grid; grid-template-columns:repeat(5,1fr); border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--panel); }
     .metric { padding:14px; border-right:1px solid var(--line); }
     .metric:last-child { border-right:0; }
     .metric span { display:block; color:var(--muted); font-size:12px; margin-bottom:7px; }
     .metric strong { font-size:22px; }
+    .allocation-controls { display:grid; grid-template-columns:repeat(4,minmax(54px,1fr)); gap:6px; align-items:end; }
+    .allocation-controls label { display:grid; gap:3px; color:var(--muted); font-size:10px; }
+    .allocation-controls input { min-width:0; width:100%; border:1px solid var(--line); background:#0d1015; color:var(--text); border-radius:5px; padding:6px; font-size:12px; }
+    .allocation-controls button { grid-column:span 4; padding:7px 8px; min-height:30px; }
     .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; overflow:auto; }
     .trade-records-scroll { max-height:214px; overflow-y:auto; border-bottom:1px solid var(--line); }
     table { width:100%; border-collapse:collapse; font-size:12px; }
@@ -816,6 +838,18 @@ PAPER_HTML = """
       <div class="metric"><span>模拟账户资金(USDT)</span><strong id="equity">-</strong></div>
       <div class="metric"><span>初始资金(USDT)</span><strong id="initial">1000.00</strong></div>
       <div class="metric"><span>复利</span><strong id="compound">YES</strong></div>
+      <div class="metric" id="capitalAllocation">
+        <span>资金使用率(%)</span>
+        <div class="allocation-controls">
+          <label>BTC<input id="allocSymbolBTCUSDT" type="number" min="0" max="100" step="1"></label>
+          <label>ETH<input id="allocSymbolETHUSDT" type="number" min="0" max="100" step="1"></label>
+          <label>1h<input id="allocInterval1h" type="number" min="0" max="100" step="1"></label>
+          <label>4h<input id="allocInterval4h" type="number" min="0" max="100" step="1"></label>
+          <label>1d<input id="allocInterval1d" type="number" min="0" max="100" step="1"></label>
+          <label>1w<input id="allocInterval1w" type="number" min="0" max="100" step="1"></label>
+          <button onclick="saveCapitalAllocation()">保存资金</button>
+        </div>
+      </div>
       <div class="metric"><span>策略周期</span><strong id="strategyIntervals">-</strong></div>
     </section>
     <section class="panel">
@@ -853,6 +887,7 @@ async function loadStatus() {
   document.getElementById('equity').textContent = Number(account.equity || 0).toFixed(2);
   document.getElementById('initial').textContent = Number(account.initial_equity || 1000).toFixed(2);
   document.getElementById('compound').textContent = account.compound ? 'YES' : 'NO';
+  fillCapitalAllocation(data.capital_allocation || {});
   updateStrategyIntervals(data.strategies || []);
   fillStrategies(data.strategies || []);
   fillPositions(data.positions || []);
@@ -863,6 +898,21 @@ async function loadStatus() {
 function loadAll() {
   loadStatus();
   return loadMarketTicker();
+}
+async function saveCapitalAllocation() {
+  const payload = readCapitalAllocation();
+  const res = await fetch('/api/paper/capital-allocation', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    alert(data.detail || '资金配置保存失败');
+    return;
+  }
+  fillCapitalAllocation(data);
+  loadStatus();
 }
 async function loadMarketTicker() {
   try {
@@ -988,9 +1038,37 @@ function updateStrategyIntervals(strategies) {
   const ordered = intervalOrder.filter(interval => active.has(interval));
   document.getElementById('strategyIntervals').textContent = ordered.length ? ordered.join(' / ') : '-';
 }
+function fillCapitalAllocation(allocation) {
+  const symbols = allocation.symbols || {};
+  const intervals = allocation.intervals || {};
+  setInputValue('allocSymbolBTCUSDT', symbols.BTCUSDT);
+  setInputValue('allocSymbolETHUSDT', symbols.ETHUSDT);
+  setInputValue('allocInterval1h', intervals['1h']);
+  setInputValue('allocInterval4h', intervals['4h']);
+  setInputValue('allocInterval1d', intervals['1d']);
+  setInputValue('allocInterval1w', intervals['1w']);
+}
+function setInputValue(id, value) {
+  const el = document.getElementById(id);
+  if (el && Number.isFinite(Number(value))) el.value = Number(value).toFixed(0);
+}
+function readCapitalAllocation() {
+  return {
+    symbols: {
+      BTCUSDT: Number(document.getElementById('allocSymbolBTCUSDT').value || 0),
+      ETHUSDT: Number(document.getElementById('allocSymbolETHUSDT').value || 0),
+    },
+    intervals: {
+      '1h': Number(document.getElementById('allocInterval1h').value || 0),
+      '4h': Number(document.getElementById('allocInterval4h').value || 0),
+      '1d': Number(document.getElementById('allocInterval1d').value || 0),
+      '1w': Number(document.getElementById('allocInterval1w').value || 0),
+    },
+  };
+}
 function fillStrategies(items) {
   document.getElementById('strategies').innerHTML = items.map(s => `
-    <tr><td>${symbolCell(s.symbol)}</td><td>${intervalCell(s.interval)}</td><td>${s.enabled ? 'YES' : 'NO'}</td><td>${date(s.last_processed_open_time)}</td><td class="muted">${summary(s.params)}</td></tr>
+    <tr><td>${symbolCell(s.symbol)}</td><td>${intervalCell(s.interval)}</td><td>${s.enabled ? 'YES' : 'NO'}</td><td>${date(s.last_processed_open_time)}</td><td class="muted"><span title="${parameterExplanation(s.params)}">${summary(s.params)}</span></td></tr>
   `).join('');
 }
 function fillPositions(items) {
@@ -999,7 +1077,7 @@ function fillPositions(items) {
   `).join('') || '<tr><td colspan="11" class="muted">暂无持仓</td></tr>';
 }
 function tradeRow(t) {
-  return `<tr><td>${symbolCell(t.symbol)}</td><td>${intervalCell(t.interval)}</td><td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td><td>${date(t.entry_time)}</td><td>${date(t.exit_time)}</td><td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td><td>${Number(t.pnl_pct).toFixed(2)}%</td><td>${t.exit_reason}</td></tr>`;
+  return `<tr><td>${symbolCell(t.symbol)}</td><td>${intervalCell(t.interval)}</td><td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td><td>${date(t.entry_time)}</td><td>${date(t.exit_time)}</td><td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td><td class="${t.pnl_pct >= 0 ? 'pos' : 'neg'}">${Number(t.pnl_pct).toFixed(2)}%</td><td>${t.exit_reason}</td></tr>`;
 }
 function fillTradeRecords(items) {
   document.getElementById('tradeRecords').innerHTML = items.map(tradeRow).join('') || '<tr><td colspan="10" class="muted">暂无交易记录</td></tr>';
@@ -1014,6 +1092,17 @@ function fillEvents(items) {
 }
 function summary(p) {
   return `EMA${p.ema_period}/MA${p.ma_period}, ADX${p.adx_min}, RSI ${p.long_rsi_min}-${p.long_rsi_max}, SL${p.stop_atr}, TP${p.take_atr}, Step${p.take_atr_step}, Max${p.take_atr_max}, Regime ${p.regime_switch ? 'YES' : 'NO'}`;
+}
+function parameterExplanation(p) {
+  return [
+    `EMA${p.ema_period}/MA${p.ma_period}: 趋势均线。周期越短越敏感，交易更频繁；周期越长越稳但可能滞后。`,
+    `ADX${p.adx_min}: 趋势强度门槛。数值越高越过滤震荡，机会更少；越低信号更多但噪音更大。`,
+    `RSI ${p.long_rsi_min}-${p.long_rsi_max}: 多头 RSI 区间。收窄会减少追高/弱势入场，放宽会增加交易。`,
+    `SL${p.stop_atr}: ATR 止损倍数。越小止损越紧，越大单笔风险更高但更不易被洗出。`,
+    `TP${p.take_atr}: 初始止盈/保护启动倍数。越大越偏趋势持有，越小越快保护利润。`,
+    `Step${p.take_atr_step}/Max${p.take_atr_max}: 动态止盈阶梯和上限。Step 越大保护位移动更慢；Max 越大给趋势更大空间。`,
+    `Regime ${p.regime_switch ? 'YES' : 'NO'}: 是否启用趋势/震荡状态切换。YES 会在震荡段使用均值回归，NO 只按趋势策略。`,
+  ].join('\\n');
 }
 document.addEventListener('DOMContentLoaded', () => {
   loadAll().finally(() => openMarketTickerStream());
