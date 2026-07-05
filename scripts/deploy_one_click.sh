@@ -11,6 +11,56 @@ HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-8001}"
 PAPER_POLL_SECONDS="${PAPER_POLL_SECONDS:-60}"
 OS_NAME="$(uname -s)"
+PROJECT_DB_PATH="${PROJECT_DB_PATH:-$ROOT_DIR/data/trading.db}"
+
+handle_existing_project_database() {
+  if [ ! -f "$PROJECT_DB_PATH" ]; then
+    return 0
+  fi
+
+  echo "检测到本项目数据库: $PROJECT_DB_PATH"
+
+  local action="${DEPLOY_EXISTING_DB_ACTION:-}"
+  if [ -z "$action" ]; then
+    if [ ! -t 0 ]; then
+      echo "当前不是交互式终端，默认保留数据库并继续部署。"
+      return 0
+    fi
+    while true; do
+      read -r -p "请选择：[s] 保留数据库并继续部署 / [d] 删除数据库后继续部署: " action
+      case "$action" in
+        s|S|skip|SKIP|保留|跳过|keep|KEEP)
+          action="skip"
+          break
+          ;;
+        d|D|delete|DELETE|删除|remove|REMOVE)
+          action="delete"
+          break
+          ;;
+        *)
+          echo "请输入 s 或 d。"
+          ;;
+      esac
+    done
+  fi
+
+  case "$action" in
+    skip|SKIP|s|S|保留|跳过|keep|KEEP)
+      echo "保留现有数据库，继续部署。"
+      ;;
+    delete|DELETE|d|D|删除|remove|REMOVE)
+      echo "准备删除现有数据库，先停止本项目 systemd 服务。"
+      sudo systemctl stop "${WEB_SERVICE}.service" 2>/dev/null || true
+      sudo systemctl stop "${LEGACY_PAPER_SERVICE}.service" 2>/dev/null || true
+      rm -f "$PROJECT_DB_PATH" "$PROJECT_DB_PATH-wal" "$PROJECT_DB_PATH-shm"
+      echo "已删除数据库: $PROJECT_DB_PATH"
+      ;;
+    *)
+      echo "DEPLOY_EXISTING_DB_ACTION 只支持 skip 或 delete。"
+      exit 1
+      ;;
+  esac
+}
 
 if ! command -v systemctl >/dev/null 2>&1; then
   if [ "$OS_NAME" = "Darwin" ]; then
@@ -27,6 +77,8 @@ fi
 if [ -f /etc/os-release ] && ! grep -qi ubuntu /etc/os-release; then
   echo "当前 Linux 不是 Ubuntu，将跳过 apt 安装，只使用现有 Python 环境继续部署。"
 fi
+
+handle_existing_project_database
 
 if command -v apt-get >/dev/null 2>&1; then
   sudo apt-get update

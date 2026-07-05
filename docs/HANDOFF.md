@@ -726,6 +726,23 @@ chmod +x start.sh scripts/diagnose_runtime.sh
   - `python3 -m py_compile app/*.py` 通过。
   - `python3 -m unittest discover -s tests -v`：50 个测试通过。
 
+## 2026-07-05 部署前数据库保护确认
+
+- `scripts/deploy_one_click.sh` 新增部署前数据库检查，目标为当前应用主库 `data/trading.db`。
+- 如果服务器上已存在本项目数据库，脚本会提示用户选择：
+  - `s` / `skip`：保留数据库并继续部署。
+  - `d` / `delete`：删除数据库后继续部署。
+- 删除数据库时会先停止 `weekly-web` 和旧 `weekly-paper` systemd 服务，再删除 `data/trading.db`、`data/trading.db-wal`、`data/trading.db-shm`，避免运行中 SQLite 残留。
+- 非交互式终端默认保留数据库并继续部署，避免自动部署或管道执行时卡住。
+- 可通过环境变量跳过交互：
+  - `DEPLOY_EXISTING_DB_ACTION=skip`
+  - `DEPLOY_EXISTING_DB_ACTION=delete`
+- 可通过 `PROJECT_DB_PATH=/path/to/trading.db` 覆盖检测目标，方便服务器目录不同或测试。
+- 验证：
+  - `bash -n scripts/deploy_one_click.sh` 通过。
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：50 个测试通过。
+
 ## 2026-07-05 Paper 收益率盈亏颜色更新
 
 - `/paper` 的 `交易记录` 和 `最近平仓` 共用同一个 `tradeRow()` 渲染函数。
