@@ -16,6 +16,14 @@
 http://127.0.0.1:8001
 ```
 
+## 停止
+
+```bash
+./stop.sh
+```
+
+`./stop.sh` 会停止本项目的 `weekly-web` / 旧 `weekly-paper` systemd 服务，以及本项目路径下的 Web、Paper runner、WebSocket collector 和后台启动进程。
+
 ## 默认策略
 
 - `EMA(15)` 与 `MA(50)` 判断主趋势。

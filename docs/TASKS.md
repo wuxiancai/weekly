@@ -19,4 +19,5 @@
 - [x] 新增 `/paper` 模拟交易状态页和 `/api/paper/status`。
 - [x] 新增 `scripts/deploy_one_click.sh` 一键部署脚本。
 - [x] 调整部署和启动为单入口：云服务器 systemd 只启动 `./start.sh`，由 `start.sh` 统一停止旧进程并启动 Web 回测系统与 Paper 模拟交易系统。
+- [x] 新增根目录 `stop.sh`，一键停止本项目 Web、Paper runner、WebSocket collector 和后台启动进程。
 - [ ] 增加资金费率、强平价、杠杆保证金模型。

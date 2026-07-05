@@ -1,5 +1,16 @@
 # Handoff
 
+## 2026-07-05 一键停止脚本
+
+- 新增根目录 `stop.sh`，用于只停止、不启动本项目运行态。
+- 停止范围：
+  - `weekly-web.service`
+  - 旧版遗留 `weekly-paper.service`
+  - `runtime/start.pid` 指向的后台 supervisor
+  - 本项目路径下的 `start.sh`、`scripts/run_paper.sh`、`scripts/collect_websocket.sh`
+  - 本项目 `.venv` 下的 `uvicorn app.main:app`、`app.paper_runner`、`app.websocket_collector`
+- 脚本执行后会删除 `runtime/start.pid`，不会删除数据库或日志。
+
 ## 当前状态
 
 已搭建 BTCUSDT 模拟自动交易系统第一版：
