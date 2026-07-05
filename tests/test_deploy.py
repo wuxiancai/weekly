@@ -16,6 +16,8 @@ class DeployScriptTests(unittest.TestCase):
         self.assertIn('"$ROOT_DIR/start.sh"', script)
         self.assertIn('WEB_SERVICE="$WEB_SERVICE"', script)
         self.assertIn("LEGACY_PAPER_SERVICE", script)
+        self.assertIn("检测到 macOS", script)
+        self.assertIn('OS_NAME="$(uname -s)"', script)
         self.assertNotIn("scripts/start.sh", script)
         self.assertNotIn("ExecStart=/usr/bin/env bash ${ROOT_DIR}/scripts/run_paper.sh", script)
         self.assertNotIn('systemctl enable "${WEB_SERVICE}.service" "${PAPER_SERVICE}.service"', script)

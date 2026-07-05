@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import unittest
 
@@ -68,6 +69,38 @@ class PaperTradingTests(unittest.TestCase):
         self.assertEqual(account["initial_equity"], 1000.0)
         self.assertEqual(account["equity"], 1000.0)
         self.assertEqual(len(strategies), 8)
+
+    def test_paper_engine_syncs_existing_strategy_params_to_code_defaults(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        init_paper_schema(conn)
+        engine = PaperEngine(conn)
+        engine.initialize()
+
+        stale_params = paper_strategy_defaults()[3].params.to_dict()
+        stale_params["ema_period"] = 99
+        conn.execute(
+            """
+            UPDATE paper_strategies
+            SET params_json = ?, enabled = 0, last_processed_open_time = ?
+            WHERE symbol = ? AND interval = ?
+            """,
+            (json.dumps(stale_params), 0, "BTCUSDT", "1h"),
+        )
+        conn.commit()
+
+        engine.initialize()
+
+        strategy = conn.execute(
+            "SELECT * FROM paper_strategies WHERE symbol = ? AND interval = ?",
+            ("BTCUSDT", "1h"),
+        ).fetchone()
+        params = json.loads(strategy["params_json"])
+        expected = paper_strategy_defaults()[3].params
+        self.assertEqual(params["ema_period"], expected.ema_period)
+        self.assertEqual(params["take_atr_max"], expected.take_atr_max)
+        self.assertEqual(strategy["enabled"], 0)
+        self.assertEqual(strategy["last_processed_open_time"], 0)
 
     def test_paper_defaults_include_capital_allocations_by_symbol_and_interval(self) -> None:
         conn = sqlite3.connect(":memory:")

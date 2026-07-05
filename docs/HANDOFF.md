@@ -699,6 +699,18 @@ chmod +x start.sh scripts/diagnose_runtime.sh
   - `python3 -m py_compile app/*.py` 通过。
   - `python3 -m unittest discover -s tests -v`：43 个测试通过。
 
+## 2026-07-05 Paper 默认参数启动同步与 macOS 部署脚本降级
+
+- 根因确认：当前本地 SQLite `data/trading.db` 中，`paper_strategies` 只有 `BTCUSDT / 1h`、`ETHUSDT / 1h` 的 `params_json` 仍是旧参数；代码里的 `paper_strategy_defaults()` 和回测页面默认参数已经是新参数。
+- 原因是 `PaperEngine.initialize()` 只用 `INSERT OR IGNORE` 初始化策略，已有 `symbol + interval` 行不会覆盖 `params_json`，导致 Paper 实际运行参数可能滞后于代码默认值。
+- 修复：`PaperEngine.initialize()` 现在会先插入缺失策略，再在 `params_json` 不同的时候把代码默认参数同步回 `paper_strategies.params_json`，同时保留原有 `enabled` 和 `last_processed_open_time`，不会重置策略启用状态或处理进度。
+- 已对本地 `data/trading.db` 执行一次同步：同步前不匹配 `BTCUSDT/1h, ETHUSDT/1h`；同步后无不匹配项。
+- `scripts/deploy_one_click.sh` 新增 macOS 分支：在 macOS 执行时不再因为缺少 systemd 报错退出，而是提示“跳过 Ubuntu/systemd 部署”并调用根目录 `start.sh` 做本机自适应启动；Ubuntu 云服务器仍走 systemd 长期部署。
+- 验证：
+  - `bash -n scripts/deploy_one_click.sh start.sh` 通过。
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：50 个测试通过。
+
 ## 2026-07-05 Paper 收益率盈亏颜色更新
 
 - `/paper` 的 `交易记录` 和 `最近平仓` 共用同一个 `tradeRow()` 渲染函数。

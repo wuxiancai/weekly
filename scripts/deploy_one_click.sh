@@ -10,10 +10,22 @@ SERVICE_USER="${SERVICE_USER:-$(whoami)}"
 HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-8001}"
 PAPER_POLL_SECONDS="${PAPER_POLL_SECONDS:-60}"
+OS_NAME="$(uname -s)"
 
 if ! command -v systemctl >/dev/null 2>&1; then
+  if [ "$OS_NAME" = "Darwin" ]; then
+    echo "检测到 macOS：跳过 Ubuntu/systemd 部署，改为本机自适应启动。"
+    echo "云服务器长期部署请在 Ubuntu 上执行本脚本；本机调试请访问 start.sh 输出的地址。"
+    chmod +x "$ROOT_DIR/start.sh"
+    HOST="$HOST" PORT="$PORT" PAPER_POLL_SECONDS="$PAPER_POLL_SECONDS" "$ROOT_DIR/start.sh"
+    exit 0
+  fi
   echo "当前系统没有 systemd，无法安装长期运行服务。请在 Ubuntu 云服务器上执行。"
   exit 1
+fi
+
+if [ -f /etc/os-release ] && ! grep -qi ubuntu /etc/os-release; then
+  echo "当前 Linux 不是 Ubuntu，将跳过 apt 安装，只使用现有 Python 环境继续部署。"
 fi
 
 if command -v apt-get >/dev/null 2>&1; then

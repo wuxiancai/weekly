@@ -342,12 +342,21 @@ class PaperEngine:
             ),
         )
         for config in paper_strategy_defaults():
+            params_json = json.dumps(config.params.to_dict())
             self.conn.execute(
                 """
                 INSERT OR IGNORE INTO paper_strategies(symbol, interval, params_json, enabled, updated_at)
                 VALUES (?, ?, ?, 1, ?)
                 """,
-                (config.symbol, config.interval, json.dumps(config.params.to_dict()), now),
+                (config.symbol, config.interval, params_json, now),
+            )
+            self.conn.execute(
+                """
+                UPDATE paper_strategies
+                SET params_json = ?, updated_at = ?
+                WHERE symbol = ? AND interval = ? AND params_json != ?
+                """,
+                (params_json, now, config.symbol, config.interval, params_json),
             )
         for symbol, pct in PAPER_DEFAULT_SYMBOL_ALLOCATIONS.items():
             self.conn.execute(
