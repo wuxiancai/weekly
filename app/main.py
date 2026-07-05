@@ -778,20 +778,21 @@ PAPER_HTML = """
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>模拟交易状态</title>
   <style>
-    :root { color-scheme: dark; --bg:#101216; --panel:#171b22; --line:#2a303a; --text:#e8edf5; --muted:#8d97a8; --green:#25c486; --red:#ff5266; --blue:#66b7ff; --purple:#b58cff; --yellow:#ffd166; }
+    :root { color-scheme: dark; --bg:#101216; --header:#0c0e12; --panel:#171b22; --ticker:#11151b; --input:#0d1015; --button:#202733; --button-border:#3b4654; --line:#2a303a; --text:#e8edf5; --muted:#8d97a8; --green:#25c486; --red:#ff5266; --blue:#66b7ff; --purple:#b58cff; --yellow:#ffd166; }
+    :root[data-theme="light"] { color-scheme: light; --bg:#f4f6f8; --header:#ffffff; --panel:#ffffff; --ticker:#f7f9fc; --input:#ffffff; --button:#eef2f7; --button-border:#c9d2df; --line:#d8e0ea; --text:#17202c; --muted:#657386; --green:#168457; --red:#d33b4f; --blue:#1667b7; --purple:#7b4cc2; --yellow:#9b6b00; }
     * { box-sizing: border-box; }
     body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); }
-    header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); background:#0c0e12; }
+    header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); background:var(--header); }
     h1 { margin:0; font-size:20px; }
     main { padding:18px; display:grid; gap:14px; }
-    .market-ticker { min-width:420px; flex:1; max-width:760px; border:1px solid var(--line); border-radius:8px; padding:8px 12px; background:#11151b; }
+    .market-ticker { min-width:420px; flex:1; max-width:760px; border:1px solid var(--line); border-radius:8px; padding:8px 12px; background:var(--ticker); }
     .ticker-row { display:flex; align-items:center; justify-content:center; gap:14px; min-height:22px; white-space:nowrap; font-weight:700; }
     .ticker-item { display:inline-flex; align-items:baseline; gap:7px; }
     .ticker-label, .clock-label { color:var(--muted); font-size:12px; }
     .ticker-price { font-size:16px; }
     .ticker-change, .clock-value { font-size:13px; }
     .nav { display:flex; gap:10px; align-items:center; }
-    a, button { border:1px solid #3b4654; background:#202733; color:var(--text); border-radius:6px; padding:9px 12px; text-decoration:none; cursor:pointer; font-weight:650; }
+    a, button { border:1px solid var(--button-border); background:var(--button); color:var(--text); border-radius:6px; padding:9px 12px; text-decoration:none; cursor:pointer; font-weight:650; }
     .grid { display:grid; grid-template-columns:minmax(150px,max-content) minmax(140px,max-content) minmax(92px,max-content) minmax(560px,1fr) max-content max-content; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--panel); align-items:stretch; }
     .metric { padding:14px 18px; border-right:1px solid var(--line); min-width:0; }
     .summary-compact { padding-left:14px; padding-right:14px; }
@@ -802,7 +803,7 @@ PAPER_HTML = """
     .strategy-interval-line, .runtime-duration-line { display:block; }
     .allocation-controls { display:flex; flex-wrap:nowrap; gap:8px; align-items:end; }
     .allocation-controls label { display:grid; gap:3px; color:var(--muted); font-size:10px; }
-    .allocation-controls input { width:64px; min-width:0; border:1px solid var(--line); background:#0d1015; color:var(--text); border-radius:5px; padding:6px; font-size:12px; }
+    .allocation-controls input { width:64px; min-width:0; border:1px solid var(--line); background:var(--input); color:var(--text); border-radius:5px; padding:6px; font-size:12px; }
     .allocation-controls button { flex:0 0 auto; padding:7px 12px; min-height:31px; white-space:nowrap; }
     .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; overflow:auto; }
     .trade-records-scroll { max-height:214px; overflow-y:auto; border-bottom:1px solid var(--line); }
@@ -833,7 +834,7 @@ PAPER_HTML = """
     <div class="nav">
       <a href="/">BTC 回测</a>
       <a href="/eth">ETH 回测</a>
-      <button onclick="loadAll()">刷新</button>
+      <button id="themeToggle" type="button" onclick="toggleTheme()">Light</button>
     </div>
   </header>
   <main>
@@ -883,6 +884,24 @@ PAPER_HTML = """
 let marketTickerSocket = null;
 let marketTickerReconnectTimer = null;
 const marketTickerState = {};
+const THEME_STORAGE_KEY = 'weekly-paper-theme';
+
+function applyTheme(theme) {
+  const selected = theme === 'light' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = selected;
+  const button = document.getElementById('themeToggle');
+  if (button) button.textContent = selected === 'dark' ? 'Light' : 'Dark';
+}
+function loadThemePreference() {
+  const saved = localStorage.getItem(THEME_STORAGE_KEY);
+  applyTheme(saved === 'light' ? 'light' : 'dark');
+}
+function toggleTheme() {
+  const current = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  const next = current === 'light' ? 'dark' : 'light';
+  localStorage.setItem(THEME_STORAGE_KEY, next);
+  applyTheme(next);
+}
 
 async function loadStatus() {
   const res = await fetch('/api/paper/status');
@@ -1121,6 +1140,7 @@ function parameterExplanation(p) {
   ].join('\\n');
 }
 document.addEventListener('DOMContentLoaded', () => {
+  loadThemePreference();
   loadAll().finally(() => openMarketTickerStream());
   updateUtc8Clock();
   setInterval(updateUtc8Clock, 1000);

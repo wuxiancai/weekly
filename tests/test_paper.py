@@ -318,6 +318,13 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("openMarketTickerStream()", PAPER_HTML)
         self.assertIn("wss://fstream.binance.com/stream?streams=btcusdt@bookTicker/ethusdt@bookTicker", PAPER_HTML)
         self.assertIn("dataset.streamState = 'open';", PAPER_HTML)
+
+    def test_paper_page_replaces_refresh_button_with_theme_toggle(self) -> None:
+        self.assertNotIn('<button onclick="loadAll()">刷新</button>', PAPER_HTML)
+        self.assertIn('id="themeToggle"', PAPER_HTML)
+        self.assertIn("function toggleTheme()", PAPER_HTML)
+        self.assertIn("weekly-paper-theme", PAPER_HTML)
+        self.assertIn(':root[data-theme="light"]', PAPER_HTML)
         self.assertIn("dataset.streamUpdates", PAPER_HTML)
         self.assertIn("setInterval(loadMarketTicker, 60000);", PAPER_HTML)
         self.assertNotIn("setInterval(loadMarketTicker, 10000);", PAPER_HTML)
