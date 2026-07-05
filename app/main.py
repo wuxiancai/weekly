@@ -880,7 +880,7 @@ PAPER_HTML = """
     </section>
     <section class="panel">
       <h2>策略状态</h2>
-      <table><thead><tr><th>交易对</th><th>周期</th><th>启用</th><th>最后处理 K 线</th><th>参数</th></tr></thead><tbody id="strategies"></tbody></table>
+      <table><thead><tr><th>交易对</th><th>周期</th><th>启用</th><th>最后处理 K 线收盘(UTC+8)</th><th>参数</th></tr></thead><tbody id="strategies"></tbody></table>
     </section>
     <section class="panel">
       <h2>交易记录</h2>
@@ -1041,12 +1041,21 @@ function updateUtc8Clock() {
 function formatDateTime(ms) {
   const value = Number(ms);
   if (!Number.isFinite(value) || value <= 0) return '-';
-  const dt = new Date(value);
-  if (Number.isNaN(dt.getTime())) return '-';
+  const utc8 = new Date(value + 8 * 60 * 60 * 1000);
+  if (Number.isNaN(utc8.getTime())) return '-';
   const pad = item => String(item).padStart(2, '0');
-  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+  return `${utc8.getUTCFullYear()}-${pad(utc8.getUTCMonth() + 1)}-${pad(utc8.getUTCDate())} ${pad(utc8.getUTCHours())}:${pad(utc8.getUTCMinutes())}:${pad(utc8.getUTCSeconds())}`;
 }
 function date(ms) { return formatDateTime(ms); }
+function intervalMs(interval) {
+  return { '1h': 60 * 60 * 1000, '4h': 4 * 60 * 60 * 1000, '1d': 24 * 60 * 60 * 1000, '1w': 7 * 24 * 60 * 60 * 1000 }[String(interval || '').toLowerCase()] || 0;
+}
+function lastProcessedCloseTime(strategy) {
+  if (strategy.last_processed_close_time) return strategy.last_processed_close_time;
+  const openTime = Number(strategy.last_processed_open_time);
+  const duration = intervalMs(strategy.interval);
+  return Number.isFinite(openTime) && openTime > 0 && duration > 0 ? openTime + duration : null;
+}
 function symbolClass(value) { return String(value || '').toUpperCase() === 'BTCUSDT' ? 'symbol-btc' : ''; }
 function intervalClass(value) {
   const normalized = String(value || '').toLowerCase();
@@ -1121,7 +1130,7 @@ function readCapitalAllocation() {
 }
 function fillStrategies(items) {
   document.getElementById('strategies').innerHTML = items.map(s => `
-    <tr><td>${symbolCell(s.symbol)}</td><td>${intervalCell(s.interval)}</td><td>${s.enabled ? 'YES' : 'NO'}</td><td>${date(s.last_processed_open_time)}</td><td class="muted"><span title="${parameterExplanation(s.params)}">${summary(s.params)}</span></td></tr>
+    <tr><td>${symbolCell(s.symbol)}</td><td>${intervalCell(s.interval)}</td><td>${s.enabled ? 'YES' : 'NO'}</td><td>${date(lastProcessedCloseTime(s))}</td><td class="muted"><span title="${parameterExplanation(s.params)}">${summary(s.params)}</span></td></tr>
   `).join('');
 }
 function fillTriggerConditions(items) {

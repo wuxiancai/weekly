@@ -9,6 +9,7 @@ from app.paper import (
     PaperEngine,
     _unsatisfied_trigger_checks,
     init_paper_schema,
+    last_processed_close_boundary_time,
     paper_strategy_defaults,
 )
 from app.strategy import StrategyParams
@@ -103,6 +104,29 @@ class PaperTradingTests(unittest.TestCase):
         self.assertEqual(params["take_atr_max"], expected.take_atr_max)
         self.assertEqual(strategy["enabled"], 0)
         self.assertEqual(strategy["last_processed_open_time"], 0)
+
+    def test_paper_status_exposes_last_processed_close_boundary_time(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        init_paper_schema(conn)
+        engine = PaperEngine(conn)
+        engine.initialize()
+        conn.execute(
+            """
+            UPDATE paper_strategies
+            SET last_processed_open_time = ?
+            WHERE symbol = ? AND interval = ?
+            """,
+            (1000, "BTCUSDT", "1d"),
+        )
+        conn.commit()
+
+        status = engine.status()
+        strategy = next(item for item in status["strategies"] if item["symbol"] == "BTCUSDT" and item["interval"] == "1d")
+
+        self.assertEqual(last_processed_close_boundary_time(1000, "1d"), 1000 + 24 * 60 * 60 * 1000)
+        self.assertEqual(strategy["last_processed_open_time"], 1000)
+        self.assertEqual(strategy["last_processed_close_time"], 1000 + 24 * 60 * 60 * 1000)
 
     def test_paper_defaults_include_capital_allocations_by_symbol_and_interval(self) -> None:
         conn = sqlite3.connect(":memory:")
@@ -355,6 +379,8 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("function symbolCell(value)", PAPER_HTML)
         self.assertIn("function intervalCell(value)", PAPER_HTML)
         self.assertIn("function formatDateTime(ms)", PAPER_HTML)
+        self.assertIn("const utc8 = new Date(value + 8 * 60 * 60 * 1000);", PAPER_HTML)
+        self.assertIn("utc8.getUTCFullYear()", PAPER_HTML)
         self.assertIn("function formatPayload(payload)", PAPER_HTML)
         self.assertIn("entry_time", PAPER_HTML)
         self.assertIn("event_time", PAPER_HTML)
@@ -383,6 +409,12 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("fetch('/api/paper/capital-allocation'", PAPER_HTML)
         self.assertIn("function parameterExplanation(p)", PAPER_HTML)
         self.assertIn('title="${parameterExplanation(s.params)}"', PAPER_HTML)
+
+    def test_paper_strategy_status_displays_last_processed_close_time(self) -> None:
+        self.assertIn("最后处理 K 线收盘(UTC+8)", PAPER_HTML)
+        self.assertIn("function lastProcessedCloseTime(strategy)", PAPER_HTML)
+        self.assertIn("date(lastProcessedCloseTime(s))", PAPER_HTML)
+        self.assertNotIn("date(s.last_processed_open_time)</td>", PAPER_HTML)
 
     def test_paper_summary_grid_uses_adaptive_widths_for_capital_allocation(self) -> None:
         self.assertNotIn(".grid { display:grid; grid-template-columns:repeat(5,1fr);", PAPER_HTML)

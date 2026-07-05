@@ -24,6 +24,12 @@ PAPER_DEFAULT_FEE_RATE = 0.0005
 PAPER_DEFAULT_SLIPPAGE_RATE = 0.0005
 PAPER_DEFAULT_SYMBOL_ALLOCATIONS = {"BTCUSDT": 80.0, "ETHUSDT": 20.0}
 PAPER_DEFAULT_INTERVAL_ALLOCATIONS = {"1h": 30.0, "4h": 40.0, "1d": 20.0, "1w": 10.0}
+INTERVAL_MS = {
+    "1h": 60 * 60 * 1000,
+    "4h": 4 * 60 * 60 * 1000,
+    "1d": 24 * 60 * 60 * 1000,
+    "1w": 7 * 24 * 60 * 60 * 1000,
+}
 
 
 @dataclass(frozen=True)
@@ -41,6 +47,15 @@ class ProcessResult:
     opened: int
     closed: int
     last_processed_open_time: int | None
+
+
+def last_processed_close_boundary_time(open_time: int | None, interval: str | None) -> int | None:
+    if open_time is None or interval is None:
+        return None
+    duration_ms = INTERVAL_MS.get(interval)
+    if duration_ms is None:
+        return int(open_time)
+    return int(open_time) + duration_ms
 
 
 def paper_strategy_defaults() -> list[PaperStrategyConfig]:
@@ -497,6 +512,10 @@ class PaperEngine:
         positions = [_enrich_position(row) for row in positions]
         trigger_conditions = [self._strategy_trigger_condition(row) for row in strategies]
         for row in strategies:
+            row["last_processed_close_time"] = last_processed_close_boundary_time(
+                row.get("last_processed_open_time"),
+                row.get("interval"),
+            )
             row["params"] = json.loads(row.pop("params_json"))
         for row in events:
             row["payload"] = json.loads(row.pop("payload_json"))
