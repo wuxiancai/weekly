@@ -30,16 +30,50 @@ run_systemctl_stop() {
   fi
 }
 
+is_project_pid() {
+  local pid="$1"
+  local command_line
+  local cwd
+
+  command_line="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+  cwd=""
+  if [ -r "/proc/${pid}/cwd" ]; then
+    cwd="$(readlink "/proc/${pid}/cwd" 2>/dev/null || true)"
+  elif command -v lsof >/dev/null 2>&1; then
+    cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
+  fi
+
+  if [ "$cwd" = "$ROOT_DIR" ]; then
+    case "$command_line" in
+      *"uvicorn app.main:app"*|*"app.paper_runner"*|*"app.websocket_collector"*|*"start.sh"*|*"run_paper.sh"*|*"collect_websocket.sh"*)
+        return 0
+        ;;
+    esac
+  fi
+
+  case "$command_line" in
+    *"$ROOT_DIR/.venv/"*|*"$ROOT_DIR/start.sh"*|*"$ROOT_DIR/scripts/start.sh"*|*"$ROOT_DIR/scripts/run_paper.sh"*|*"$ROOT_DIR/scripts/collect_websocket.sh"*)
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
 append_unique_pid() {
   local new_pid="$1"
   local existing
   [ -n "$new_pid" ] || return 0
   [ "$new_pid" != "$$" ] || return 0
   [ "$new_pid" != "${PPID:-}" ] || return 0
-  for existing in "${PIDS_TO_STOP[@]}"; do
+  while IFS= read -r existing; do
+    [ -n "$existing" ] || continue
     [ "$existing" != "$new_pid" ] || return 0
-  done
-  PIDS_TO_STOP+=("$new_pid")
+  done <<EOF
+$PIDS_TO_STOP
+EOF
+  PIDS_TO_STOP="${PIDS_TO_STOP}${new_pid}
+"
 }
 
 collect_pid_file() {
@@ -53,7 +87,11 @@ collect_pid_file() {
       ;;
   esac
   if kill -0 "$pid" 2>/dev/null; then
-    append_unique_pid "$pid"
+    if is_project_pid "$pid"; then
+      append_unique_pid "$pid"
+    else
+      echo "忽略 runtime/start.pid 中非本项目进程或已复用 PID: $pid"
+    fi
   fi
 }
 
@@ -61,26 +99,37 @@ collect_project_pattern() {
   local pattern="$1"
   local pid
   while IFS= read -r pid; do
-    append_unique_pid "$pid"
+    [ -n "$pid" ] || continue
+    if is_project_pid "$pid"; then
+      append_unique_pid "$pid"
+    fi
   done < <(pgrep -f "$pattern" 2>/dev/null || true)
 }
 
 stop_pids() {
   local pid
-  [ "${#PIDS_TO_STOP[@]}" -gt 0 ] || return 0
+  [ -n "$PIDS_TO_STOP" ] || return 0
 
-  echo "停止本项目进程: ${PIDS_TO_STOP[*]}"
-  kill "${PIDS_TO_STOP[@]}" 2>/dev/null || true
+  echo "停止本项目进程: $(printf '%s' "$PIDS_TO_STOP" | tr '\n' ' ')"
+  while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    kill "$pid" 2>/dev/null || true
+  done <<EOF
+$PIDS_TO_STOP
+EOF
   sleep 2
-  for pid in "${PIDS_TO_STOP[@]}"; do
+  while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
     if kill -0 "$pid" 2>/dev/null; then
       echo "进程仍在运行，强制停止: $pid"
       kill -9 "$pid" 2>/dev/null || true
     fi
-  done
+  done <<EOF
+$PIDS_TO_STOP
+EOF
 }
 
-PIDS_TO_STOP=()
+PIDS_TO_STOP=""
 
 run_systemctl_stop "$WEB_SERVICE"
 run_systemctl_stop "$LEGACY_PAPER_SERVICE"

@@ -3,6 +3,9 @@
 ## 2026-07-05 一键停止脚本
 
 - 新增根目录 `stop.sh`，用于只停止、不启动本项目运行态。
+- 2026-07-05 修复：macOS 自带 bash 3.2 在 `set -u` 下会对空数组展开报 `unbound variable`，`stop.sh` 已改用 newline PID 列表以兼容 macOS/Ubuntu。
+- 2026-07-05 加固：读取 `runtime/start.pid` 时会先确认 PID 仍属于本项目，避免旧 PID 被系统复用后误杀其他进程。
+- 2026-07-05 加固：`pgrep -f` 的结果也统一经过本项目 PID 识别过滤，避免测试命令或其他命令行包含脚本文本时被误收集。
 - 停止范围：
   - `weekly-web.service`
   - 旧版遗留 `weekly-paper.service`
