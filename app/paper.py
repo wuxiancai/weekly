@@ -21,6 +21,8 @@ PAPER_DEFAULT_COMPOUND = True
 PAPER_DEFAULT_LEVERAGE = 0.0
 PAPER_DEFAULT_FEE_RATE = 0.0005
 PAPER_DEFAULT_SLIPPAGE_RATE = 0.0005
+PAPER_DEFAULT_SYMBOL_ALLOCATIONS = {"BTCUSDT": 80.0, "ETHUSDT": 20.0}
+PAPER_DEFAULT_INTERVAL_ALLOCATIONS = {"1h": 30.0, "4h": 40.0, "1d": 20.0, "1w": 10.0}
 
 
 @dataclass(frozen=True)
@@ -228,6 +230,14 @@ def init_paper_schema(conn: Any) -> None:
             PRIMARY KEY (symbol, interval)
         );
 
+        CREATE TABLE IF NOT EXISTS paper_capital_allocations (
+            scope TEXT NOT NULL,
+            key TEXT NOT NULL,
+            pct REAL NOT NULL,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (scope, key)
+        );
+
         CREATE TABLE IF NOT EXISTS paper_positions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             symbol TEXT NOT NULL,
@@ -339,6 +349,22 @@ class PaperEngine:
                 """,
                 (config.symbol, config.interval, json.dumps(config.params.to_dict()), now),
             )
+        for symbol, pct in PAPER_DEFAULT_SYMBOL_ALLOCATIONS.items():
+            self.conn.execute(
+                """
+                INSERT OR IGNORE INTO paper_capital_allocations(scope, key, pct, updated_at)
+                VALUES ('symbol', ?, ?, ?)
+                """,
+                (symbol, pct, now),
+            )
+        for interval, pct in PAPER_DEFAULT_INTERVAL_ALLOCATIONS.items():
+            self.conn.execute(
+                """
+                INSERT OR IGNORE INTO paper_capital_allocations(scope, key, pct, updated_at)
+                VALUES ('interval', ?, ?, ?)
+                """,
+                (interval, pct, now),
+            )
         self.conn.commit()
 
     def process_strategy(self, symbol: str, interval: str, candles: list[dict[str, Any]]) -> ProcessResult:
@@ -398,27 +424,28 @@ class PaperEngine:
 
             if position is None and action_signal in ("LONG", "SHORT") and signal_atr and previous is not None:
                 position = self._open_position(symbol, interval, action_signal, previous, row, float(signal_atr), params, account)
-                account = self._load_account()
-                opened += 1
-                _update_position_adverse(position, close)
-                same_bar_exit, same_bar_reason = _exit_decision(position, float(row["high"]), float(row["low"]), close, "HOLD")
-                if same_bar_exit is not None:
-                    equity, trade = _close_position(
-                        position,
-                        open_time,
-                        same_bar_exit,
-                        float(account["equity"]),
-                        float(account["fee_rate"]),
-                        float(account["slippage_rate"]),
-                        same_bar_reason,
-                    )
-                    self._delete_position(symbol, interval)
-                    self._record_trade(symbol, interval, trade)
-                    account = self._update_account_equity(equity)
-                    position = None
-                    closed += 1
-                else:
-                    self._save_position(symbol, interval, position)
+                if position is not None:
+                    account = self._load_account()
+                    opened += 1
+                    _update_position_adverse(position, close)
+                    same_bar_exit, same_bar_reason = _exit_decision(position, float(row["high"]), float(row["low"]), close, "HOLD")
+                    if same_bar_exit is not None:
+                        equity, trade = _close_position(
+                            position,
+                            open_time,
+                            same_bar_exit,
+                            float(account["equity"]),
+                            float(account["fee_rate"]),
+                            float(account["slippage_rate"]),
+                            same_bar_reason,
+                        )
+                        self._delete_position(symbol, interval)
+                        self._record_trade(symbol, interval, trade)
+                        account = self._update_account_equity(equity)
+                        position = None
+                        closed += 1
+                    else:
+                        self._save_position(symbol, interval, position)
 
             if position is not None:
                 self._save_position(symbol, interval, position)
@@ -470,7 +497,32 @@ class PaperEngine:
             "trades": trades,
             "events": events,
             "equity_curve": list(reversed(curves)),
+            "capital_allocation": self._capital_allocation_status(account, strategies),
         }
+
+    def update_capital_allocation(self, symbols: dict[str, float], intervals: dict[str, float]) -> None:
+        symbol_values = self._validated_allocation("symbol", symbols, PAPER_DEFAULT_SYMBOL_ALLOCATIONS)
+        interval_values = self._validated_allocation("interval", intervals, PAPER_DEFAULT_INTERVAL_ALLOCATIONS)
+        now = _now_ms()
+        for key, pct in symbol_values.items():
+            self.conn.execute(
+                """
+                INSERT INTO paper_capital_allocations(scope, key, pct, updated_at)
+                VALUES ('symbol', ?, ?, ?)
+                ON CONFLICT(scope, key) DO UPDATE SET pct=excluded.pct, updated_at=excluded.updated_at
+                """,
+                (key, pct, now),
+            )
+        for key, pct in interval_values.items():
+            self.conn.execute(
+                """
+                INSERT INTO paper_capital_allocations(scope, key, pct, updated_at)
+                VALUES ('interval', ?, ?, ?)
+                ON CONFLICT(scope, key) DO UPDATE SET pct=excluded.pct, updated_at=excluded.updated_at
+                """,
+                (key, pct, now),
+            )
+        self.conn.commit()
 
     def record_event(self, symbol: str, interval: str, event_type: str, payload: dict[str, Any]) -> None:
         now = _now_ms()
@@ -529,13 +581,23 @@ class PaperEngine:
         signal_atr: float,
         params: StrategyParams,
         account: Any,
-    ) -> Position:
+    ) -> Position | None:
         slippage_rate = float(account["slippage_rate"])
         fee_rate = float(account["fee_rate"])
         entry_price = float(row["open"]) * (1 + slippage_rate if side == "LONG" else 1 - slippage_rate)
         equity = float(account["equity"])
         initial_equity = float(account["initial_equity"])
         entry_base = equity if bool(account["compound"]) else min(equity, initial_equity)
+        slot_available = self._available_allocation_margin(symbol, interval, account)
+        entry_base = min(entry_base, slot_available)
+        if entry_base <= 0:
+            self._record_event(
+                symbol,
+                interval,
+                "SKIP_OPEN_NO_CAPITAL",
+                {"side": side, "entry_time": int(row["open_time"]), "available_margin": slot_available},
+            )
+            return None
         entry_notional = entry_base * _notional_multiplier(float(account["leverage"]))
         quantity = entry_notional / entry_price
         fee = entry_notional * fee_rate
@@ -686,6 +748,74 @@ class PaperEngine:
             """,
             (symbol, interval, now, event_type, json.dumps(payload), now),
         )
+
+    def _capital_allocation_status(self, account: dict[str, Any], strategies: list[dict[str, Any]]) -> dict[str, Any]:
+        symbols = self._allocation_map("symbol", PAPER_DEFAULT_SYMBOL_ALLOCATIONS)
+        intervals = self._allocation_map("interval", PAPER_DEFAULT_INTERVAL_ALLOCATIONS)
+        equity = float(account["equity"])
+        used = {
+            (row["symbol"], row["interval"]): float(row["used_margin"] or 0)
+            for row in self.conn.execute(
+                """
+                SELECT symbol, interval, SUM(entry_margin) AS used_margin
+                FROM paper_positions
+                GROUP BY symbol, interval
+                """
+            )
+        }
+        slots = []
+        for strategy in strategies:
+            symbol = strategy["symbol"]
+            interval = strategy["interval"]
+            allocated = equity * symbols.get(symbol, 0.0) / 100 * intervals.get(interval, 0.0) / 100
+            used_margin = used.get((symbol, interval), 0.0)
+            slots.append(
+                {
+                    "symbol": symbol,
+                    "interval": interval,
+                    "symbol_pct": symbols.get(symbol, 0.0),
+                    "interval_pct": intervals.get(interval, 0.0),
+                    "allocated_margin": round(allocated, 4),
+                    "used_margin": round(used_margin, 4),
+                    "available_margin": round(max(0.0, allocated - used_margin), 4),
+                }
+            )
+        return {"symbols": symbols, "intervals": intervals, "slots": slots}
+
+    def _available_allocation_margin(self, symbol: str, interval: str, account: Any) -> float:
+        symbols = self._allocation_map("symbol", PAPER_DEFAULT_SYMBOL_ALLOCATIONS)
+        intervals = self._allocation_map("interval", PAPER_DEFAULT_INTERVAL_ALLOCATIONS)
+        allocated = float(account["equity"]) * symbols.get(symbol, 0.0) / 100 * intervals.get(interval, 0.0) / 100
+        row = self.conn.execute(
+            "SELECT SUM(entry_margin) AS used_margin FROM paper_positions WHERE symbol = ? AND interval = ?",
+            (symbol, interval),
+        ).fetchone()
+        used_margin = float(row["used_margin"] or 0) if row is not None else 0.0
+        return max(0.0, allocated - used_margin)
+
+    def _allocation_map(self, scope: str, defaults: dict[str, float]) -> dict[str, float]:
+        rows = self.conn.execute("SELECT key, pct FROM paper_capital_allocations WHERE scope = ?", (scope,)).fetchall()
+        values = dict(defaults)
+        for row in rows:
+            values[row["key"]] = float(row["pct"])
+        return values
+
+    def _validated_allocation(self, scope: str, values: dict[str, float], defaults: dict[str, float]) -> dict[str, float]:
+        normalized: dict[str, float] = {}
+        for key in defaults:
+            try:
+                pct = float(values[key])
+            except KeyError as exc:
+                raise ValueError(f"缺少{scope}资金配置：{key}") from exc
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{scope}资金配置不是数字：{key}") from exc
+            if pct < 0 or pct > 100:
+                raise ValueError(f"{scope}资金配置必须在 0-100：{key}")
+            normalized[key] = pct
+        total = sum(normalized.values())
+        if total > 100.0001:
+            raise ValueError(f"{scope}资金配置总和不能超过 100")
+        return normalized
 
 
 def _now_ms() -> int:
