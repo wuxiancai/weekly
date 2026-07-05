@@ -8,6 +8,7 @@
 - 样式位于 `app/main.py` 的 `PAPER_HTML`，`strategyIntervals` 使用 `strategy-intervals` / `strategy-interval-line` 类，字号为 `18px`。
 - `updateStrategyIntervals()` 仍从 `/api/paper/status` 的启用策略动态推导周期，只改变展示分组，不改变策略运行逻辑。
 - 追加修正：右侧“策略周期”和“已运行时间”两列改为 `max-content` 自适应宽度，并统一使用紧凑 padding；“已运行时间”也改为两行小字显示，例如 `0天0小时` / `23分`，避免撑宽或被截断。
+- 启动验证时同步加固 `start.sh`：清理旧进程前会过滤确认 PID 属于本项目，避免 daemon/foreground 切换时误杀自身；后台 `nohup` 启动也重定向 stdin 到 `/dev/null`。
 
 ## 2026-07-05 一键停止脚本
 
