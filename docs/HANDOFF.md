@@ -743,6 +743,16 @@ chmod +x start.sh scripts/diagnose_runtime.sh
   - `python3 -m py_compile app/*.py` 通过。
   - `python3 -m unittest discover -s tests -v`：50 个测试通过。
 
+## 2026-07-05 macOS 部署前也检查数据库
+
+- 用户指出上一版数据库检查只发生在 Ubuntu/systemd 部署路径，macOS 执行 `bash scripts/deploy_one_click.sh` 会先进入本机启动分支，不会询问保留或删除数据库。
+- 修复：`scripts/deploy_one_click.sh` 现在在判断 systemd/macOS 分支之前先执行 `handle_existing_project_database`，因此 macOS 本机调试启动前也会检查 `data/trading.db` 并询问保留或删除。
+- 删除数据库时仅在 `systemctl` 存在时停止 `weekly-web` / `weekly-paper` 服务；macOS 下不会调用 systemd，只删除 `trading.db`、`trading.db-wal`、`trading.db-shm`。
+- 验证：
+  - `bash -n scripts/deploy_one_click.sh` 通过。
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：50 个测试通过。
+
 ## 2026-07-05 Paper 当前持仓价格颜色
 
 - `/paper` 的 `当前持仓` 表格中：

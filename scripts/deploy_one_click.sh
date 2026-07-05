@@ -49,9 +49,13 @@ handle_existing_project_database() {
       echo "保留现有数据库，继续部署。"
       ;;
     delete|DELETE|d|D|删除|remove|REMOVE)
-      echo "准备删除现有数据库，先停止本项目 systemd 服务。"
-      sudo systemctl stop "${WEB_SERVICE}.service" 2>/dev/null || true
-      sudo systemctl stop "${LEGACY_PAPER_SERVICE}.service" 2>/dev/null || true
+      if command -v systemctl >/dev/null 2>&1; then
+        echo "准备删除现有数据库，先停止本项目 systemd 服务。"
+        sudo systemctl stop "${WEB_SERVICE}.service" 2>/dev/null || true
+        sudo systemctl stop "${LEGACY_PAPER_SERVICE}.service" 2>/dev/null || true
+      else
+        echo "准备删除现有数据库。"
+      fi
       rm -f "$PROJECT_DB_PATH" "$PROJECT_DB_PATH-wal" "$PROJECT_DB_PATH-shm"
       echo "已删除数据库: $PROJECT_DB_PATH"
       ;;
@@ -61,6 +65,8 @@ handle_existing_project_database() {
       ;;
   esac
 }
+
+handle_existing_project_database
 
 if ! command -v systemctl >/dev/null 2>&1; then
   if [ "$OS_NAME" = "Darwin" ]; then
@@ -77,8 +83,6 @@ fi
 if [ -f /etc/os-release ] && ! grep -qi ubuntu /etc/os-release; then
   echo "当前 Linux 不是 Ubuntu，将跳过 apt 安装，只使用现有 Python 环境继续部署。"
 fi
-
-handle_existing_project_database
 
 if command -v apt-get >/dev/null 2>&1; then
   sudo apt-get update

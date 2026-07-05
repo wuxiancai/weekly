@@ -23,6 +23,11 @@ class DeployScriptTests(unittest.TestCase):
         self.assertIn("保留数据库并继续部署", script)
         self.assertIn("删除数据库后继续部署", script)
         self.assertIn('rm -f "$PROJECT_DB_PATH" "$PROJECT_DB_PATH-wal" "$PROJECT_DB_PATH-shm"', script)
+        self.assertIn("if command -v systemctl >/dev/null 2>&1; then", script)
+        self.assertLess(
+            script.index("handle_existing_project_database\n\nif ! command -v systemctl"),
+            script.index('if [ "$OS_NAME" = "Darwin" ]'),
+        )
         self.assertNotIn("scripts/start.sh", script)
         self.assertNotIn("ExecStart=/usr/bin/env bash ${ROOT_DIR}/scripts/run_paper.sh", script)
         self.assertNotIn('systemctl enable "${WEB_SERVICE}.service" "${PAPER_SERVICE}.service"', script)
