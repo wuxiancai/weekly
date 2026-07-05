@@ -213,6 +213,9 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("fillTradeRecords(data.trade_records || data.trades || []);", PAPER_HTML)
         self.assertIn("function fillTradeRecords(items)", PAPER_HTML)
 
+    def test_paper_trade_rows_color_return_rate_by_profit_or_loss(self) -> None:
+        self.assertIn('<td class="${t.pnl_pct >= 0 ? \'pos\' : \'neg\'}">${Number(t.pnl_pct).toFixed(2)}%</td>', PAPER_HTML)
+
     def test_paper_page_shows_intervals_amounts_and_formatted_log_times(self) -> None:
         self.assertIn("<th>交易对</th><th>周期</th><th>方向</th>", PAPER_HTML)
         self.assertIn("<th>入场价</th><th>强平价格</th><th>数量</th><th>保证金</th>", PAPER_HTML)

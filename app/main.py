@@ -999,7 +999,7 @@ function fillPositions(items) {
   `).join('') || '<tr><td colspan="11" class="muted">暂无持仓</td></tr>';
 }
 function tradeRow(t) {
-  return `<tr><td>${symbolCell(t.symbol)}</td><td>${intervalCell(t.interval)}</td><td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td><td>${date(t.entry_time)}</td><td>${date(t.exit_time)}</td><td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td><td>${Number(t.pnl_pct).toFixed(2)}%</td><td>${t.exit_reason}</td></tr>`;
+  return `<tr><td>${symbolCell(t.symbol)}</td><td>${intervalCell(t.interval)}</td><td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td><td>${date(t.entry_time)}</td><td>${date(t.exit_time)}</td><td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td><td class="${t.pnl_pct >= 0 ? 'pos' : 'neg'}">${Number(t.pnl_pct).toFixed(2)}%</td><td>${t.exit_reason}</td></tr>`;
 }
 function fillTradeRecords(items) {
   document.getElementById('tradeRecords').innerHTML = items.map(tradeRow).join('') || '<tr><td colspan="10" class="muted">暂无交易记录</td></tr>';

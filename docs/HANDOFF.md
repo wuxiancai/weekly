@@ -699,6 +699,15 @@ chmod +x start.sh scripts/diagnose_runtime.sh
   - `python3 -m py_compile app/*.py` 通过。
   - `python3 -m unittest discover -s tests -v`：43 个测试通过。
 
+## 2026-07-05 Paper 收益率盈亏颜色更新
+
+- `/paper` 的 `交易记录` 和 `最近平仓` 共用同一个 `tradeRow()` 渲染函数。
+- 已将两张表里的 `收益率` 单元格改为按 `pnl_pct >= 0` 加 `pos`，否则加 `neg`，与 `收益(USDT)` 的红亏绿赢显示保持一致。
+- 新增回归测试覆盖该 HTML 模板，避免后续再漏掉收益率颜色。
+- 验证：
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：44 个测试通过。
+
 ## 下一步建议
 
 1. 在页面点击“同步 Binance 数据”确认 2019-09-02 到 2026-06-29 的周线入库。
