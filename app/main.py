@@ -1073,7 +1073,7 @@ function fillStrategies(items) {
 }
 function fillPositions(items) {
   document.getElementById('positions').innerHTML = items.map(p => `
-    <tr><td>${symbolCell(p.symbol)}</td><td>${intervalCell(p.interval)}</td><td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${date(p.entry_time)}</td><td>${formatPrice(p.entry_price)}</td><td>${formatPrice(p.liquidation_price)}</td><td>${Number(p.quantity).toFixed(6)}</td><td>${formatAmount(p.entry_margin)}</td><td>${formatPrice(p.stop_price)}</td><td>${formatPrice(p.initial_take_price)}</td><td>${formatPrice(p.latest_take_price)}</td></tr>
+    <tr><td>${symbolCell(p.symbol)}</td><td>${intervalCell(p.interval)}</td><td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${date(p.entry_time)}</td><td>${formatPrice(p.entry_price)}</td><td>${formatPrice(p.liquidation_price)}</td><td>${Number(p.quantity).toFixed(6)}</td><td>${formatAmount(p.entry_margin)}</td><td class="neg">${formatPrice(p.stop_price)}</td><td class="pos">${formatPrice(p.initial_take_price)}</td><td class="pos">${formatPrice(p.latest_take_price)}</td></tr>
   `).join('') || '<tr><td colspan="11" class="muted">暂无持仓</td></tr>';
 }
 function tradeRow(t) {

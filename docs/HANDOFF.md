@@ -743,6 +743,17 @@ chmod +x start.sh scripts/diagnose_runtime.sh
   - `python3 -m py_compile app/*.py` 通过。
   - `python3 -m unittest discover -s tests -v`：50 个测试通过。
 
+## 2026-07-05 Paper 当前持仓价格颜色
+
+- `/paper` 的 `当前持仓` 表格中：
+  - `止损` 单元格改为红色字体。
+  - `保护/止盈` 单元格改为绿色字体。
+  - `最新止盈` 单元格改为绿色字体。
+- 实现复用页面已有的 `neg` / `pos` 颜色类，未新增额外配色。
+- 验证：
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：50 个测试通过。
+
 ## 2026-07-05 Paper 收益率盈亏颜色更新
 
 - `/paper` 的 `交易记录` 和 `最近平仓` 共用同一个 `tradeRow()` 渲染函数。
