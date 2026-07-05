@@ -42,6 +42,32 @@ has_systemd() {
   command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]
 }
 
+is_project_pid() {
+  local pid="$1"
+  local command_line
+  local cwd
+  command_line="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+  cwd=""
+  if [ -r "/proc/${pid}/cwd" ]; then
+    cwd="$(readlink "/proc/${pid}/cwd" 2>/dev/null || true)"
+  elif command -v lsof >/dev/null 2>&1; then
+    cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
+  fi
+  if [ "$cwd" = "$ROOT_DIR" ]; then
+    case "$command_line" in
+      *"uvicorn app.main:app"*|*"app.paper_runner"*|*"app.websocket_collector"*|*"start.sh"*)
+        return 0
+        ;;
+    esac
+  fi
+  case "$command_line" in
+    *"$ROOT_DIR/.venv/"*|*"$ROOT_DIR/start.sh"*|*"$ROOT_DIR/scripts/start.sh"*|*"WorkingDirectory=${ROOT_DIR}"*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 stop_existing_project_processes() {
   local patterns=(
     "$ROOT_DIR/start.sh"
@@ -53,12 +79,17 @@ stop_existing_project_processes() {
   )
   local pid
   local pids=()
+  local existing
 
   for pattern in "${patterns[@]}"; do
     while IFS= read -r pid; do
       [ -n "$pid" ] || continue
       [ "$pid" != "$$" ] || continue
       [ "$pid" != "${PPID:-}" ] || continue
+      is_project_pid "$pid" || continue
+      for existing in "${pids[@]}"; do
+        [ "$existing" != "$pid" ] || continue 2
+      done
       pids+=("$pid")
     done < <(pgrep -f "$pattern" 2>/dev/null || true)
   done
@@ -200,32 +231,6 @@ port_pids() {
   if command -v ss >/dev/null 2>&1; then
     ss -ltnp "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | sort -u
   fi
-}
-
-is_project_pid() {
-  local pid="$1"
-  local command_line
-  local cwd
-  command_line="$(ps -p "$pid" -o command= 2>/dev/null || true)"
-  cwd=""
-  if [ -r "/proc/${pid}/cwd" ]; then
-    cwd="$(readlink "/proc/${pid}/cwd" 2>/dev/null || true)"
-  elif command -v lsof >/dev/null 2>&1; then
-    cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
-  fi
-  if [ "$cwd" = "$ROOT_DIR" ]; then
-    case "$command_line" in
-      *"uvicorn app.main:app"*|*"app.paper_runner"*|*"start.sh"*)
-        return 0
-        ;;
-    esac
-  fi
-  case "$command_line" in
-    *"$ROOT_DIR/.venv/"*|*"$ROOT_DIR/start.sh"*|*"$ROOT_DIR/scripts/start.sh"*|*"WorkingDirectory=${ROOT_DIR}"*)
-      return 0
-      ;;
-  esac
-  return 1
 }
 
 terminate_pids() {
