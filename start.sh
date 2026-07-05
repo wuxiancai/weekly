@@ -158,9 +158,9 @@ if [ "$START_MODE" = "daemon" ]; then
     exit 0
   fi
   if [ "${#PASSTHROUGH_ARGS[@]}" -gt 0 ]; then
-    nohup "$ROOT_DIR/start.sh" --foreground "${PASSTHROUGH_ARGS[@]}" >> runtime/logs/start.log 2>&1 &
+    nohup "$ROOT_DIR/start.sh" --foreground "${PASSTHROUGH_ARGS[@]}" </dev/null >> runtime/logs/start.log 2>&1 &
   else
-    nohup "$ROOT_DIR/start.sh" --foreground >> runtime/logs/start.log 2>&1 &
+    nohup "$ROOT_DIR/start.sh" --foreground </dev/null >> runtime/logs/start.log 2>&1 &
   fi
   SUPERVISOR_PID="$!"
   echo "$SUPERVISOR_PID" > runtime/start.pid
