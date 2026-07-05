@@ -38,6 +38,15 @@ class BacktestTests(unittest.TestCase):
         self.assertIn('<option value="false">NO</option>', HTML)
         self.assertIn('<option value="true" selected>YES</option>', HTML)
 
+    def test_backtest_pages_include_mobile_responsive_css_only_layout_changes(self) -> None:
+        self.assertIn("@media (max-width: 640px)", HTML)
+        self.assertIn("header { align-items:stretch; flex-direction:column;", HTML)
+        self.assertIn(".toolbar { grid-template-columns:1fr;", HTML)
+        self.assertIn(".chart-wrap { height:360px; }", HTML)
+        self.assertIn("table { min-width:820px; font-size:11px; }", HTML)
+        self.assertIn("-webkit-overflow-scrolling:touch", HTML)
+        self.assertIn("@media (max-width: 640px)", ETH_HTML)
+
     def test_page_places_optimization_below_trades_and_shows_trade_metrics(self) -> None:
         self.assertLess(HTML.index("逐笔交易"), HTML.index("参数优化结果"))
         self.assertIn("收益率", HTML)

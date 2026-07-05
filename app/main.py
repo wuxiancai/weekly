@@ -345,12 +345,13 @@ HTML = """
     .metric:last-child { border-right:0; }
     .metric span { display:block; color:var(--muted); font-size:12px; margin-bottom:6px; }
     .metric strong { font-size:20px; }
-    .panel { padding:12px; }
+    .panel { padding:12px; overflow:auto; -webkit-overflow-scrolling:touch; }
     .chart-wrap { height:520px; }
     canvas { width:100%; height:100%; display:block; background:#11151b; border-radius:6px; }
-    table { width:100%; border-collapse:collapse; font-size:12px; }
+    table { width:100%; min-width:760px; border-collapse:collapse; font-size:12px; }
     th, td { border-bottom:1px solid var(--line); padding:8px; text-align:right; white-space:nowrap; }
-    th:first-child, td:first-child { text-align:left; }
+    th:first-child, td:first-child { text-align:left; position:sticky; left:0; z-index:1; background:var(--panel); }
+    th:first-child { z-index:2; }
     th { color:var(--muted); font-weight:600; }
     .pos { color:var(--green); }
     .neg { color:var(--red); }
@@ -358,7 +359,26 @@ HTML = """
     .status { color:var(--muted); font-size:13px; }
     .formula { color:var(--muted); font-size:12px; line-height:1.6; margin:4px 0 12px; }
     .formula a { color:var(--blue); text-decoration:none; }
-    @media (max-width: 980px) { .toolbar { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 980px) { .toolbar { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 640px) {
+      header { align-items:stretch; flex-direction:column; gap:10px; padding:14px 12px; }
+      h1 { font-size:18px; line-height:1.35; }
+      .header-actions { align-items:stretch; flex-direction:column; gap:8px; }
+      .nav-button { min-height:40px; }
+      .status { line-height:1.5; }
+      main { padding:10px; gap:10px; }
+      .toolbar { grid-template-columns:1fr; gap:8px; padding:10px; }
+      input, select, button { min-height:42px; font-size:16px; }
+      .grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+      .metric { padding:11px 10px; border-right:0; border-bottom:1px solid var(--line); }
+      .metric:nth-child(odd) { border-right:1px solid var(--line); }
+      .metric strong { font-size:17px; }
+      .panel { padding:10px; border-radius:7px; }
+      .chart-wrap { height:360px; }
+      table { min-width:820px; font-size:11px; }
+      th, td { padding:7px 8px; }
+      .formula { font-size:11px; line-height:1.55; }
+    }
   </style>
 </head>
 <body>
@@ -818,10 +838,11 @@ PAPER_HTML = """
     .trigger-reason { margin-top:6px; min-height:14px; white-space:nowrap; }
     .trigger-satisfied strong { color:var(--green); }
     .trigger-unsatisfied strong, .trigger-no-data strong, .trigger-data-insufficient strong, .trigger-disabled strong { color:var(--muted); }
-    .trade-records-scroll { max-height:214px; overflow-y:auto; border-bottom:1px solid var(--line); }
-    table { width:100%; border-collapse:collapse; font-size:12px; }
+    .trade-records-scroll { max-height:214px; overflow:auto; -webkit-overflow-scrolling:touch; border-bottom:1px solid var(--line); }
+    table { width:100%; min-width:760px; border-collapse:collapse; font-size:12px; }
     th, td { border-bottom:1px solid var(--line); padding:8px; text-align:right; white-space:nowrap; }
-    th:first-child, td:first-child { text-align:left; }
+    th:first-child, td:first-child { text-align:left; position:sticky; left:0; z-index:1; background:var(--panel); }
+    th:first-child { z-index:2; }
     th { color:var(--muted); }
     .muted { color:var(--muted); }
     .pos { color:var(--green); }
@@ -830,7 +851,29 @@ PAPER_HTML = """
     .interval-1d { color:var(--red); font-weight:700; }
     .interval-4h { color:var(--purple); font-weight:700; }
     .interval-1h { color:var(--yellow); font-weight:700; }
-    @media (max-width: 900px) { .grid { grid-template-columns:repeat(2,1fr); } .trigger-grid, .trigger-items { grid-template-columns:1fr; } header { align-items:stretch; flex-direction:column; gap:12px; } .market-ticker { min-width:0; max-width:none; width:100%; padding:8px 10px; } .ticker-row { justify-content:flex-start; gap:9px; overflow:auto; } .ticker-item { gap:4px; } .ticker-label, .clock-label { font-size:11px; } .ticker-price { font-size:14px; } .ticker-change, .clock-value { font-size:12px; } }
+    @media (max-width: 900px) { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .trigger-grid, .trigger-items { grid-template-columns:1fr; } header { align-items:stretch; flex-direction:column; gap:12px; } .market-ticker { min-width:0; max-width:none; width:100%; padding:8px 10px; } .ticker-row { justify-content:flex-start; gap:9px; overflow:auto; -webkit-overflow-scrolling:touch; } .ticker-item { gap:4px; } .ticker-label, .clock-label { font-size:11px; } .ticker-price { font-size:14px; } .ticker-change, .clock-value { font-size:12px; } }
+    @media (max-width: 640px) {
+      header { padding:14px 12px; }
+      h1 { font-size:18px; line-height:1.35; }
+      main { padding:10px; gap:10px; }
+      .nav { width:100%; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+      .nav a, .nav button { padding:10px 8px; text-align:center; }
+      .grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .metric { padding:11px 10px; border-right:0; border-bottom:1px solid var(--line); }
+      .metric:nth-child(odd) { border-right:1px solid var(--line); }
+      .metric strong { font-size:17px; }
+      #capitalAllocation { grid-column:1 / -1; }
+      .allocation-controls { flex-wrap:wrap; gap:6px; }
+      .allocation-controls label { flex:1 1 58px; }
+      .allocation-controls input { width:100%; min-height:38px; font-size:16px; }
+      .allocation-controls button { flex:1 1 100%; min-height:40px; }
+      .strategy-intervals, .runtime-duration { font-size:16px; }
+      .panel { padding:10px; border-radius:7px; }
+      .trigger-card { padding:12px; }
+      table { min-width:820px; font-size:11px; }
+      th, td { padding:7px 8px; }
+      .trade-records-scroll { max-height:260px; }
+    }
   </style>
 </head>
 <body>

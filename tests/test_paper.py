@@ -424,6 +424,14 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn(".allocation-controls input { width:64px;", PAPER_HTML)
         self.assertIn(".allocation-controls button { flex:0 0 auto;", PAPER_HTML)
 
+    def test_paper_page_includes_mobile_responsive_css_only_layout_changes(self) -> None:
+        self.assertIn("@media (max-width: 640px)", PAPER_HTML)
+        self.assertIn(".nav { width:100%; display:grid; grid-template-columns:repeat(3,minmax(0,1fr));", PAPER_HTML)
+        self.assertIn("#capitalAllocation { grid-column:1 / -1; }", PAPER_HTML)
+        self.assertIn(".allocation-controls { flex-wrap:wrap; gap:6px; }", PAPER_HTML)
+        self.assertIn("table { min-width:820px; font-size:11px; }", PAPER_HTML)
+        self.assertIn("-webkit-overflow-scrolling:touch", PAPER_HTML)
+
     def test_paper_summary_shows_runtime_duration_after_strategy_intervals(self) -> None:
         self.assertIn('<div class="metric summary-compact"><span>策略周期</span><strong id="strategyIntervals" class="strategy-intervals">-</strong></div>', PAPER_HTML)
         self.assertIn('<div class="metric summary-compact"><span>已运行时间</span><strong id="runtimeDuration" class="runtime-duration">-</strong></div>', PAPER_HTML)
