@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -494,6 +495,7 @@ class PaperEngine:
         events = [dict(row) for row in self.conn.execute("SELECT * FROM paper_events ORDER BY id DESC LIMIT 20")]
         curves = [dict(row) for row in self.conn.execute("SELECT * FROM paper_equity_curve ORDER BY open_time DESC LIMIT 50")]
         positions = [_enrich_position(row) for row in positions]
+        trigger_conditions = [self._strategy_trigger_condition(row) for row in strategies]
         for row in strategies:
             row["params"] = json.loads(row.pop("params_json"))
         for row in events:
@@ -501,6 +503,7 @@ class PaperEngine:
         return {
             "account": account,
             "strategies": strategies,
+            "trigger_conditions": trigger_conditions,
             "positions": positions,
             "trade_records": trade_records,
             "trades": trades,
@@ -552,6 +555,44 @@ class PaperEngine:
             "SELECT * FROM paper_strategies WHERE symbol = ? AND interval = ?",
             (symbol, interval),
         ).fetchone()
+
+    def _strategy_trigger_condition(self, strategy: dict[str, Any]) -> dict[str, Any]:
+        symbol = str(strategy["symbol"])
+        interval = str(strategy["interval"])
+        if not int(strategy["enabled"]):
+            return _trigger_condition(symbol, interval, "DISABLED", "HOLD", None, None, "策略停用")
+
+        params = params_from_dict(json.loads(strategy["params_json"]))
+        candles = self._recent_candles(symbol, interval, _warmup_count(params))
+        if not candles:
+            return _trigger_condition(symbol, interval, "NO_DATA", "HOLD", None, None, "暂无本地 K 线数据")
+
+        enriched = enrich_candles(candles, params)
+        current = enriched[-1]
+        previous = enriched[-2] if len(enriched) >= 2 else None
+        signal = str(current.get("signal") or "HOLD")
+        open_time = int(current["open_time"])
+        close_time = int(current["close_time"])
+        if _missing_signal_inputs(current, params, previous):
+            return _trigger_condition(symbol, interval, "DATA_INSUFFICIENT", "HOLD", open_time, close_time, "指标预热不足")
+        if signal in ("LONG", "SHORT"):
+            return _trigger_condition(symbol, interval, "SATISFIED", signal, open_time, close_time, f"满足 {signal} 触发条件")
+        return _trigger_condition(symbol, interval, "UNSATISFIED", "HOLD", open_time, close_time, "未满足触发条件")
+
+    def _recent_candles(self, symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
+        try:
+            rows = self.conn.execute(
+                """
+                SELECT * FROM candles
+                WHERE symbol = ? AND interval = ?
+                ORDER BY open_time DESC
+                LIMIT ?
+                """,
+                (symbol, interval, limit),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return []
+        return [dict(row) for row in reversed(rows)]
 
     def _load_position(self, symbol: str, interval: str) -> Position | None:
         row = self.conn.execute(
@@ -829,6 +870,50 @@ class PaperEngine:
 
 def _now_ms() -> int:
     return int(time.time() * 1000)
+
+
+def _warmup_count(params: StrategyParams) -> int:
+    periods = [
+        params.ema_period,
+        params.ma_period,
+        params.rsi_period,
+        params.atr_period,
+        params.adx_period,
+        26,
+        20,
+    ]
+    return max(max(int(value or 0) for value in periods) + 5, 60)
+
+
+def _missing_signal_inputs(row: dict[str, Any], params: StrategyParams, previous: dict[str, Any] | None) -> bool:
+    required = ["ema", "ma", "rsi", "atr", "macd_hist", "bb_upper", "bb_lower", "adx", "volume_sma"]
+    if any(row.get(key) is None for key in required):
+        return True
+    if params.regime_switch and row.get("bb_mid") is None:
+        return True
+    if previous is None:
+        return True
+    return False
+
+
+def _trigger_condition(
+    symbol: str,
+    interval: str,
+    status: str,
+    signal: str,
+    open_time: int | None,
+    close_time: int | None,
+    message: str,
+) -> dict[str, Any]:
+    return {
+        "symbol": symbol,
+        "interval": interval,
+        "status": status,
+        "signal": signal,
+        "current_open_time": open_time,
+        "current_close_time": close_time,
+        "message": message,
+    }
 
 
 def _enrich_position(row: dict[str, Any]) -> dict[str, Any]:

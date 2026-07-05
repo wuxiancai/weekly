@@ -400,6 +400,33 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("function formatRuntimeDuration(startedAt)", PAPER_HTML)
         self.assertIn('<span class="runtime-duration-line">${days}天${hours}小时</span><span class="runtime-duration-line">${minutes}分</span>', PAPER_HTML)
 
+    def test_paper_status_exposes_independent_trigger_conditions(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        init_paper_schema(conn)
+        engine = PaperEngine(conn)
+        engine.initialize()
+
+        data = engine.status()
+
+        self.assertIn("trigger_conditions", data)
+        self.assertEqual(len(data["trigger_conditions"]), 8)
+        first = data["trigger_conditions"][0]
+        self.assertIn("symbol", first)
+        self.assertIn("interval", first)
+        self.assertIn("status", first)
+        self.assertIn("signal", first)
+        self.assertIn("current_open_time", first)
+        self.assertIn("message", first)
+
+    def test_paper_page_shows_trigger_conditions_above_strategy_status(self) -> None:
+        self.assertIn("<h2>策略触发条件</h2>", PAPER_HTML)
+        self.assertLess(PAPER_HTML.index("<h2>策略触发条件</h2>"), PAPER_HTML.index("<h2>策略状态</h2>"))
+        self.assertIn('id="triggerConditions"', PAPER_HTML)
+        self.assertIn("fillTriggerConditions(data.trigger_conditions || []);", PAPER_HTML)
+        self.assertIn("function fillTriggerConditions(items)", PAPER_HTML)
+        self.assertIn("当前已收盘 K 线满足方向信号；实际开仓还取决于下一根 K 线处理、已有持仓和可用资金。", PAPER_HTML)
+
     def test_runtime_api_exposes_commit_and_paper_page_markers(self) -> None:
         data = main.system_runtime()
 

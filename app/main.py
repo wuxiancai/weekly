@@ -806,6 +806,17 @@ PAPER_HTML = """
     .allocation-controls input { width:64px; min-width:0; border:1px solid var(--line); background:var(--input); color:var(--text); border-radius:5px; padding:6px; font-size:12px; }
     .allocation-controls button { flex:0 0 auto; padding:7px 12px; min-height:31px; white-space:nowrap; }
     .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; overflow:auto; }
+    .trigger-note { margin:0 0 12px; color:var(--muted); font-size:12px; }
+    .trigger-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .trigger-card { border:1px solid var(--line); border-radius:8px; padding:14px; background:var(--ticker); }
+    .trigger-card h3 { margin:0 0 6px; font-size:16px; }
+    .trigger-card p { margin:0 0 12px; color:var(--muted); font-size:12px; }
+    .trigger-items { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+    .trigger-item { border:1px solid var(--line); border-radius:6px; padding:10px; min-width:0; }
+    .trigger-item strong { display:block; margin-bottom:6px; font-size:13px; }
+    .trigger-item span { display:block; color:var(--muted); font-size:12px; overflow:hidden; text-overflow:ellipsis; }
+    .trigger-satisfied strong { color:var(--green); }
+    .trigger-unsatisfied strong, .trigger-no-data strong, .trigger-data-insufficient strong, .trigger-disabled strong { color:var(--muted); }
     .trade-records-scroll { max-height:214px; overflow-y:auto; border-bottom:1px solid var(--line); }
     table { width:100%; border-collapse:collapse; font-size:12px; }
     th, td { border-bottom:1px solid var(--line); padding:8px; text-align:right; white-space:nowrap; }
@@ -818,7 +829,7 @@ PAPER_HTML = """
     .interval-1d { color:var(--red); font-weight:700; }
     .interval-4h { color:var(--purple); font-weight:700; }
     .interval-1h { color:var(--yellow); font-weight:700; }
-    @media (max-width: 900px) { .grid { grid-template-columns:repeat(2,1fr); } header { align-items:stretch; flex-direction:column; gap:12px; } .market-ticker { min-width:0; max-width:none; width:100%; padding:8px 10px; } .ticker-row { justify-content:flex-start; gap:9px; overflow:auto; } .ticker-item { gap:4px; } .ticker-label, .clock-label { font-size:11px; } .ticker-price { font-size:14px; } .ticker-change, .clock-value { font-size:12px; } }
+    @media (max-width: 900px) { .grid { grid-template-columns:repeat(2,1fr); } .trigger-grid, .trigger-items { grid-template-columns:1fr; } header { align-items:stretch; flex-direction:column; gap:12px; } .market-ticker { min-width:0; max-width:none; width:100%; padding:8px 10px; } .ticker-row { justify-content:flex-start; gap:9px; overflow:auto; } .ticker-item { gap:4px; } .ticker-label, .clock-label { font-size:11px; } .ticker-price { font-size:14px; } .ticker-change, .clock-value { font-size:12px; } }
   </style>
 </head>
 <body>
@@ -860,6 +871,11 @@ PAPER_HTML = """
     <section class="panel">
       <h2>当前持仓</h2>
       <table><thead><tr><th>交易对</th><th>周期</th><th>方向</th><th>入场时间</th><th>入场价</th><th>强平价格</th><th>数量</th><th>保证金</th><th>止损</th><th>保护/止盈</th><th>最新止盈</th></tr></thead><tbody id="positions"></tbody></table>
+    </section>
+    <section class="panel">
+      <h2>策略触发条件</h2>
+      <p class="trigger-note">当前已收盘 K 线满足方向信号；实际开仓还取决于下一根 K 线处理、已有持仓和可用资金。</p>
+      <div id="triggerConditions" class="trigger-grid"></div>
     </section>
     <section class="panel">
       <h2>策略状态</h2>
@@ -913,6 +929,7 @@ async function loadStatus() {
   document.getElementById('runtimeDuration').innerHTML = formatRuntimeDuration(account.started_at);
   fillCapitalAllocation(data.capital_allocation || {});
   updateStrategyIntervals(data.strategies || []);
+  fillTriggerConditions(data.trigger_conditions || []);
   fillStrategies(data.strategies || []);
   fillPositions(data.positions || []);
   fillTradeRecords(data.trade_records || data.trades || []);
@@ -1105,6 +1122,37 @@ function fillStrategies(items) {
   document.getElementById('strategies').innerHTML = items.map(s => `
     <tr><td>${symbolCell(s.symbol)}</td><td>${intervalCell(s.interval)}</td><td>${s.enabled ? 'YES' : 'NO'}</td><td>${date(s.last_processed_open_time)}</td><td class="muted"><span title="${parameterExplanation(s.params)}">${summary(s.params)}</span></td></tr>
   `).join('');
+}
+function fillTriggerConditions(items) {
+  const symbolOrder = ['BTCUSDT', 'ETHUSDT'];
+  const intervalOrder = ['1w', '1d', '4h', '1h'];
+  const bySymbol = items.reduce((acc, item) => {
+    (acc[item.symbol] = acc[item.symbol] || []).push(item);
+    return acc;
+  }, {});
+  document.getElementById('triggerConditions').innerHTML = symbolOrder.map(symbol => {
+    const rows = (bySymbol[symbol] || []).sort((a, b) => intervalOrder.indexOf(a.interval) - intervalOrder.indexOf(b.interval));
+    const satisfied = rows.filter(item => item.status === 'SATISFIED').length;
+    const cells = intervalOrder.map(interval => {
+      const item = rows.find(row => row.interval === interval) || { symbol, interval, status: 'NO_DATA', signal: 'HOLD', message: '暂无本地 K 线数据' };
+      return `<div class="trigger-item trigger-${String(item.status || '').toLowerCase().replaceAll('_', '-')}">
+        <strong>${triggerLabel(item)}</strong>
+        <span>${intervalCell(interval)} ${date(item.current_close_time)}</span>
+      </div>`;
+    }).join('');
+    return `<div class="trigger-card">
+      <h3>${symbolCell(symbol)} 已满足 ${satisfied}/${rows.length || intervalOrder.length}</h3>
+      <p>4 个周期独立判断，某个周期满足只影响该周期自己的模拟交易。</p>
+      <div class="trigger-items">${cells}</div>
+    </div>`;
+  }).join('');
+}
+function triggerLabel(item) {
+  if (item.status === 'SATISFIED') return `满足 ${item.signal}`;
+  if (item.status === 'DISABLED') return '策略停用';
+  if (item.status === 'DATA_INSUFFICIENT') return '数据不足';
+  if (item.status === 'NO_DATA') return '暂无数据';
+  return '未满足';
 }
 function fillPositions(items) {
   document.getElementById('positions').innerHTML = items.map(p => `
