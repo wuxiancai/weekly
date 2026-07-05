@@ -711,6 +711,21 @@ chmod +x start.sh scripts/diagnose_runtime.sh
   - `python3 -m py_compile app/*.py` 通过。
   - `python3 -m unittest discover -s tests -v`：50 个测试通过。
 
+## 2026-07-05 macOS Bash 3.2 启动兼容修复
+
+- 用户在 macOS 执行 `bash scripts/deploy_one_click.sh` 后，`start.sh` 报错：`line 129: PASSTHROUGH_ARGS[@]: unbound variable`。
+- 根因：macOS 默认 Bash 是 `3.2.57`，在 `set -u` 下空数组直接展开 `"${PASSTHROUGH_ARGS[@]}"` 会被视为未绑定变量。
+- 进一步真实启动验证发现：通过 `bash start.sh` 启动时 `$0` 是相对名 `start.sh`，`nohup "$0"` 会按 PATH 查找，当前目录不在 PATH 时会报 `nohup: start.sh: No such file or directory`。
+- 修复：`start.sh` 在后台模式中先判断 `PASSTHROUGH_ARGS` 长度；无额外参数时不展开空数组；并统一用绝对路径 `"$ROOT_DIR/start.sh"` 交给 `nohup`。
+- 真实验证：
+  - `START_USE_SYSTEMD=0 bash start.sh --daemon` 成功启动后台 supervisor。
+  - `curl http://127.0.0.1:8001/api/system/runtime` 返回 `dynamic_strategy_intervals=true`、`new_title=true`、`hardcoded_old_intervals=false`。
+  - 验证后已停止测试启动的后台进程。
+- 回归验证：
+  - `bash -n start.sh scripts/deploy_one_click.sh` 通过。
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：50 个测试通过。
+
 ## 2026-07-05 Paper 收益率盈亏颜色更新
 
 - `/paper` 的 `交易记录` 和 `最近平仓` 共用同一个 `tradeRow()` 渲染函数。

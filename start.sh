@@ -126,7 +126,11 @@ if [ "$START_MODE" = "daemon" ]; then
     install_or_restart_systemd_service
     exit 0
   fi
-  nohup "$0" --foreground "${PASSTHROUGH_ARGS[@]}" >> runtime/logs/start.log 2>&1 &
+  if [ "${#PASSTHROUGH_ARGS[@]}" -gt 0 ]; then
+    nohup "$ROOT_DIR/start.sh" --foreground "${PASSTHROUGH_ARGS[@]}" >> runtime/logs/start.log 2>&1 &
+  else
+    nohup "$ROOT_DIR/start.sh" --foreground >> runtime/logs/start.log 2>&1 &
+  fi
   SUPERVISOR_PID="$!"
   echo "$SUPERVISOR_PID" > runtime/start.pid
   echo "start.sh 已在后台启动: pid=${SUPERVISOR_PID}"
