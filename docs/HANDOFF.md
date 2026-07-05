@@ -13,6 +13,7 @@
 - 重要口径：没有修改任何交易策略或开仓逻辑；4 个周期仍然是独立交易策略，某个周期满足只说明该周期当前已收盘 K 线产生方向信号，不要求其他周期共振。
 - `/api/paper/status` 新增 `trigger_conditions` 字段，状态计算复用 `StrategyParams`、`enrich_candles()` 和现有 `signal` 输出，只读取本地 `candles` 表，不调用 `process_strategy()`，不提交开仓。
 - 页面说明文案明确：实际开仓还取决于下一根 K 线处理、已有持仓和可用资金。
+- 2026-07-05 追加：`trigger_conditions` 内每个周期新增 `failed_checks`，用于解释 `未满足` 具体卡在哪些参数上，例如 ADX、RSI、成交量、趋势/动能或状态策略条件；`/paper` 卡片只显示首要未满足原因，鼠标悬停显示完整原因，不改变任何开仓逻辑。
 
 ## 2026-07-05 Paper 右上角主题切换
 

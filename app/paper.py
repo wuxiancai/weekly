@@ -14,7 +14,7 @@ from .backtest import (
     _notional_multiplier,
     _update_position_adverse,
 )
-from .strategy import StrategyParams, enrich_candles, params_from_dict
+from .strategy import StrategyParams, enrich_candles, market_regime_for, params_from_dict
 
 
 PAPER_DEFAULT_INITIAL_EQUITY = 1000.0
@@ -577,7 +577,17 @@ class PaperEngine:
             return _trigger_condition(symbol, interval, "DATA_INSUFFICIENT", "HOLD", open_time, close_time, "指标预热不足")
         if signal in ("LONG", "SHORT"):
             return _trigger_condition(symbol, interval, "SATISFIED", signal, open_time, close_time, f"满足 {signal} 触发条件")
-        return _trigger_condition(symbol, interval, "UNSATISFIED", "HOLD", open_time, close_time, "未满足触发条件")
+        failed_checks = _unsatisfied_trigger_checks(current, params, previous)
+        return _trigger_condition(
+            symbol,
+            interval,
+            "UNSATISFIED",
+            "HOLD",
+            open_time,
+            close_time,
+            "未满足触发条件",
+            failed_checks,
+        )
 
     def _recent_candles(self, symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         try:
@@ -896,6 +906,98 @@ def _missing_signal_inputs(row: dict[str, Any], params: StrategyParams, previous
     return False
 
 
+def _unsatisfied_trigger_checks(
+    row: dict[str, Any],
+    params: StrategyParams,
+    previous: dict[str, Any] | None,
+) -> list[str]:
+    if params.regime_switch:
+        regime = market_regime_for(row, params)
+        if regime == "RANGE":
+            return _range_trigger_checks(row, params)
+        if regime != "TREND":
+            return [f"市场状态 {regime}，未达到趋势或震荡开仓条件"]
+    return _trend_trigger_checks(row, params, previous)
+
+
+def _trend_trigger_checks(row: dict[str, Any], params: StrategyParams, previous: dict[str, Any] | None) -> list[str]:
+    close = float(row["close"])
+    ema_value = float(row["ema"])
+    ma_value = float(row["ma"])
+    rsi_value = float(row["rsi"])
+    adx_value = float(row["adx"])
+    volume_value = float(row["volume"])
+    volume_required = float(row["volume_sma"]) * params.volume_mult
+    checks: list[str] = []
+
+    if adx_value < params.adx_min:
+        checks.append(f"ADX {_fmt(adx_value)} < 最小值 {_fmt(params.adx_min)}")
+    if volume_value < volume_required:
+        checks.append(f"成交量 {_fmt(volume_value)} < 均量要求 {_fmt(volume_required)}")
+
+    if ema_value >= ma_value:
+        if close <= ema_value:
+            checks.append(f"收盘价 {_fmt(close)} 未站上 EMA {_fmt(ema_value)}")
+        if not (params.long_rsi_min <= rsi_value <= params.long_rsi_max):
+            checks.append(
+                f"多头 RSI {_fmt(rsi_value)} 不在 {_fmt(params.long_rsi_min)}-{_fmt(params.long_rsi_max)}"
+            )
+        if row.get("plus_di") is None or row.get("minus_di") is None or float(row["plus_di"]) <= float(row["minus_di"]):
+            checks.append("多头方向指标未占优")
+        if float(row["macd_hist"]) <= 0 and not _long_reentry_candidate(row, previous):
+            checks.append("MACD 动能未支持多头，且未形成趋势内再入场")
+        if close > float(row["bb_upper"]) * 1.01:
+            checks.append("收盘价高于布林上轨追涨过滤")
+    else:
+        if close >= ema_value:
+            checks.append(f"收盘价 {_fmt(close)} 未跌破 EMA {_fmt(ema_value)}")
+        if not (params.short_rsi_min <= rsi_value <= params.short_rsi_max):
+            checks.append(
+                f"空头 RSI {_fmt(rsi_value)} 不在 {_fmt(params.short_rsi_min)}-{_fmt(params.short_rsi_max)}"
+            )
+        if row.get("plus_di") is None or row.get("minus_di") is None or float(row["minus_di"]) <= float(row["plus_di"]):
+            checks.append("空头方向指标未占优")
+        if float(row["macd_hist"]) >= 0:
+            checks.append("MACD 动能未支持空头")
+        if close < float(row["bb_lower"]) * 0.99:
+            checks.append("收盘价低于布林下轨追空过滤")
+
+    if not checks:
+        checks.append("趋势、动能、RSI、成交量未同时满足")
+    return checks
+
+
+def _range_trigger_checks(row: dict[str, Any], params: StrategyParams) -> list[str]:
+    close = float(row["close"])
+    rsi_value = float(row["rsi"])
+    lower_entry = float(row["bb_lower"]) * 1.01
+    upper_entry = float(row["bb_upper"]) * 0.99
+    checks: list[str] = []
+    if close > lower_entry and close < upper_entry:
+        checks.append("价格未触及震荡区间上下轨")
+    if rsi_value > params.range_rsi_low and rsi_value < params.range_rsi_high:
+        checks.append(
+            f"震荡 RSI {_fmt(rsi_value)} 未低于 {_fmt(params.range_rsi_low)} 或高于 {_fmt(params.range_rsi_high)}"
+        )
+    if not checks:
+        checks.append("震荡开仓条件未同时满足")
+    return checks
+
+
+def _long_reentry_candidate(row: dict[str, Any], previous: dict[str, Any] | None) -> bool:
+    if previous is None or previous.get("ema") is None or previous.get("ma") is None:
+        return False
+    close = float(row["close"])
+    previous_close = float(previous["close"])
+    return previous_close <= float(previous["ema"]) and close > float(row["ema"]) or (
+        previous_close <= float(previous["ma"]) and close > float(row["ma"])
+    )
+
+
+def _fmt(value: float) -> str:
+    return f"{float(value):.2f}"
+
+
 def _trigger_condition(
     symbol: str,
     interval: str,
@@ -904,6 +1006,7 @@ def _trigger_condition(
     open_time: int | None,
     close_time: int | None,
     message: str,
+    failed_checks: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
         "symbol": symbol,
@@ -913,6 +1016,7 @@ def _trigger_condition(
         "current_open_time": open_time,
         "current_close_time": close_time,
         "message": message,
+        "failed_checks": failed_checks or [],
     }
 
 

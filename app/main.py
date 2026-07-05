@@ -815,6 +815,7 @@ PAPER_HTML = """
     .trigger-item { border:1px solid var(--line); border-radius:6px; padding:10px; min-width:0; }
     .trigger-item strong { display:block; margin-bottom:6px; font-size:13px; }
     .trigger-item span { display:block; color:var(--muted); font-size:12px; overflow:hidden; text-overflow:ellipsis; }
+    .trigger-reason { margin-top:6px; min-height:14px; white-space:nowrap; }
     .trigger-satisfied strong { color:var(--green); }
     .trigger-unsatisfied strong, .trigger-no-data strong, .trigger-data-insufficient strong, .trigger-disabled strong { color:var(--muted); }
     .trade-records-scroll { max-height:214px; overflow-y:auto; border-bottom:1px solid var(--line); }
@@ -1135,9 +1136,10 @@ function fillTriggerConditions(items) {
     const satisfied = rows.filter(item => item.status === 'SATISFIED').length;
     const cells = intervalOrder.map(interval => {
       const item = rows.find(row => row.interval === interval) || { symbol, interval, status: 'NO_DATA', signal: 'HOLD', message: '暂无本地 K 线数据' };
-      return `<div class="trigger-item trigger-${String(item.status || '').toLowerCase().replaceAll('_', '-')}">
+      return `<div class="trigger-item trigger-${String(item.status || '').toLowerCase().replaceAll('_', '-')}" title="${triggerDetails(item)}">
         <strong>${triggerLabel(item)}</strong>
         <span>${intervalCell(interval)} ${date(item.current_close_time)}</span>
+        <span class="trigger-reason">${triggerReason(item)}</span>
       </div>`;
     }).join('');
     return `<div class="trigger-card">
@@ -1153,6 +1155,16 @@ function triggerLabel(item) {
   if (item.status === 'DATA_INSUFFICIENT') return '数据不足';
   if (item.status === 'NO_DATA') return '暂无数据';
   return '未满足';
+}
+function triggerReason(item) {
+  const checks = Array.isArray(item.failed_checks) ? item.failed_checks : [];
+  if (checks.length > 0) return checks[0];
+  return item.message || '';
+}
+function triggerDetails(item) {
+  const checks = Array.isArray(item.failed_checks) ? item.failed_checks : [];
+  if (checks.length > 0) return checks.join('；');
+  return item.message || triggerLabel(item);
 }
 function fillPositions(items) {
   document.getElementById('positions').innerHTML = items.map(p => `

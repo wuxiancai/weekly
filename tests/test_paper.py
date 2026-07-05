@@ -7,9 +7,11 @@ from app.main import HTML, PAPER_HTML
 from app.paper import (
     PAPER_DEFAULT_INITIAL_EQUITY,
     PaperEngine,
+    _unsatisfied_trigger_checks,
     init_paper_schema,
     paper_strategy_defaults,
 )
+from app.strategy import StrategyParams
 
 
 class PaperTradingTests(unittest.TestCase):
@@ -418,6 +420,31 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("signal", first)
         self.assertIn("current_open_time", first)
         self.assertIn("message", first)
+        self.assertIn("failed_checks", first)
+
+    def test_unsatisfied_trigger_checks_name_the_failed_parameters(self) -> None:
+        params = StrategyParams(adx_min=25, long_rsi_min=35, long_rsi_max=85, volume_mult=1.5)
+        row = {
+            "close": 100.0,
+            "ema": 95.0,
+            "ma": 90.0,
+            "rsi": 90.0,
+            "atr": 2.0,
+            "macd_hist": 1.0,
+            "bb_upper": 120.0,
+            "bb_lower": 80.0,
+            "adx": 12.0,
+            "plus_di": 30.0,
+            "minus_di": 10.0,
+            "volume": 100.0,
+            "volume_sma": 100.0,
+        }
+
+        checks = _unsatisfied_trigger_checks(row, params, None)
+
+        self.assertIn("ADX 12.00 < 最小值 25.00", checks)
+        self.assertIn("多头 RSI 90.00 不在 35.00-85.00", checks)
+        self.assertIn("成交量 100.00 < 均量要求 150.00", checks)
 
     def test_paper_page_shows_trigger_conditions_above_strategy_status(self) -> None:
         self.assertIn("<h2>策略触发条件</h2>", PAPER_HTML)
@@ -425,6 +452,8 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn('id="triggerConditions"', PAPER_HTML)
         self.assertIn("fillTriggerConditions(data.trigger_conditions || []);", PAPER_HTML)
         self.assertIn("function fillTriggerConditions(items)", PAPER_HTML)
+        self.assertIn("triggerReason(item)", PAPER_HTML)
+        self.assertIn("triggerDetails(item)", PAPER_HTML)
         self.assertIn("当前已收盘 K 线满足方向信号；实际开仓还取决于下一根 K 线处理、已有持仓和可用资金。", PAPER_HTML)
 
     def test_runtime_api_exposes_commit_and_paper_page_markers(self) -> None:
