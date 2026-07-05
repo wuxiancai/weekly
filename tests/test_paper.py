@@ -337,6 +337,13 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("function parameterExplanation(p)", PAPER_HTML)
         self.assertIn('title="${parameterExplanation(s.params)}"', PAPER_HTML)
 
+    def test_paper_summary_grid_uses_adaptive_widths_for_capital_allocation(self) -> None:
+        self.assertNotIn(".grid { display:grid; grid-template-columns:repeat(5,1fr);", PAPER_HTML)
+        self.assertIn("grid-template-columns:minmax(150px,max-content) minmax(140px,max-content) minmax(92px,max-content) minmax(560px,1fr) minmax(210px,max-content)", PAPER_HTML)
+        self.assertIn(".allocation-controls { display:flex; flex-wrap:nowrap;", PAPER_HTML)
+        self.assertIn(".allocation-controls input { width:64px;", PAPER_HTML)
+        self.assertIn(".allocation-controls button { flex:0 0 auto;", PAPER_HTML)
+
     def test_runtime_api_exposes_commit_and_paper_page_markers(self) -> None:
         data = main.system_runtime()
 

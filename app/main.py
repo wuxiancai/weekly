@@ -792,15 +792,15 @@ PAPER_HTML = """
     .ticker-change, .clock-value { font-size:13px; }
     .nav { display:flex; gap:10px; align-items:center; }
     a, button { border:1px solid #3b4654; background:#202733; color:var(--text); border-radius:6px; padding:9px 12px; text-decoration:none; cursor:pointer; font-weight:650; }
-    .grid { display:grid; grid-template-columns:repeat(5,1fr); border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--panel); }
-    .metric { padding:14px; border-right:1px solid var(--line); }
+    .grid { display:grid; grid-template-columns:minmax(150px,max-content) minmax(140px,max-content) minmax(92px,max-content) minmax(560px,1fr) minmax(210px,max-content); border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--panel); align-items:stretch; }
+    .metric { padding:14px 18px; border-right:1px solid var(--line); min-width:0; }
     .metric:last-child { border-right:0; }
     .metric span { display:block; color:var(--muted); font-size:12px; margin-bottom:7px; }
     .metric strong { font-size:22px; }
-    .allocation-controls { display:grid; grid-template-columns:repeat(4,minmax(54px,1fr)); gap:6px; align-items:end; }
+    .allocation-controls { display:flex; flex-wrap:nowrap; gap:8px; align-items:end; }
     .allocation-controls label { display:grid; gap:3px; color:var(--muted); font-size:10px; }
-    .allocation-controls input { min-width:0; width:100%; border:1px solid var(--line); background:#0d1015; color:var(--text); border-radius:5px; padding:6px; font-size:12px; }
-    .allocation-controls button { grid-column:span 4; padding:7px 8px; min-height:30px; }
+    .allocation-controls input { width:64px; min-width:0; border:1px solid var(--line); background:#0d1015; color:var(--text); border-radius:5px; padding:6px; font-size:12px; }
+    .allocation-controls button { flex:0 0 auto; padding:7px 12px; min-height:31px; white-space:nowrap; }
     .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; overflow:auto; }
     .trade-records-scroll { max-height:214px; overflow-y:auto; border-bottom:1px solid var(--line); }
     table { width:100%; border-collapse:collapse; font-size:12px; }

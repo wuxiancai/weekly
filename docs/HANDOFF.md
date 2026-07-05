@@ -725,6 +725,20 @@ chmod +x start.sh scripts/diagnose_runtime.sh
   - `python3 -m unittest discover -s tests -v`：48 个测试通过。
   - Playwright 打开 `http://127.0.0.1:8765/paper`，快照确认顶部显示 BTC/ETH/1h/4h/1d/1w 输入框，默认值为 `80/20/30/40/20/10`；唯一 console error 是 `favicon.ico` 404。
 
+## 2026-07-05 Paper 顶部资金配置布局优化
+
+- 用户指出顶部 `资金使用率(%)` UI 被等宽网格挤成两行，不应和账户资金、初始资金、复利、策略周期强制等宽。
+- `/paper` 顶部指标条已从 `repeat(5, 1fr)` 改为自适应列宽：
+  - `模拟账户资金`、`初始资金`、`复利` 按内容收窄。
+  - `资金使用率(%)` 占主要可伸缩空间。
+  - `策略周期` 按内容宽度显示。
+- `资金使用率(%)` 控件从 4 列 grid 改为单行 flex，BTC/ETH/1h/4h/1d/1w 和 `保存资金` 保持同一行。
+- 验证：
+  - 新增回归测试确保 Paper 顶部不再使用 `repeat(5,1fr)`，资金控件使用单行 flex。
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：49 个测试通过。
+  - Playwright 打开 `http://127.0.0.1:8765/paper`，DOM 尺寸确认资金控件同一行；截图人工确认顶部布局更紧凑。
+
 ## 下一步建议
 
 1. 在页面点击“同步 Binance 数据”确认 2019-09-02 到 2026-06-29 的周线入库。
