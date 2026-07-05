@@ -373,10 +373,18 @@ class PaperTradingTests(unittest.TestCase):
 
     def test_paper_summary_grid_uses_adaptive_widths_for_capital_allocation(self) -> None:
         self.assertNotIn(".grid { display:grid; grid-template-columns:repeat(5,1fr);", PAPER_HTML)
-        self.assertIn("grid-template-columns:minmax(150px,max-content) minmax(140px,max-content) minmax(92px,max-content) minmax(560px,1fr) minmax(210px,max-content)", PAPER_HTML)
+        self.assertIn("grid-template-columns:minmax(150px,max-content) minmax(140px,max-content) minmax(92px,max-content) minmax(560px,1fr) minmax(210px,max-content) minmax(150px,max-content)", PAPER_HTML)
         self.assertIn(".allocation-controls { display:flex; flex-wrap:nowrap;", PAPER_HTML)
         self.assertIn(".allocation-controls input { width:64px;", PAPER_HTML)
         self.assertIn(".allocation-controls button { flex:0 0 auto;", PAPER_HTML)
+
+    def test_paper_summary_shows_runtime_duration_after_strategy_intervals(self) -> None:
+        self.assertIn('<div class="metric"><span>策略周期</span><strong id="strategyIntervals">-</strong></div>', PAPER_HTML)
+        self.assertIn('<div class="metric"><span>已运行时间</span><strong id="runtimeDuration">-</strong></div>', PAPER_HTML)
+        self.assertLess(PAPER_HTML.index('id="strategyIntervals"'), PAPER_HTML.index('id="runtimeDuration"'))
+        self.assertIn("formatRuntimeDuration(account.started_at)", PAPER_HTML)
+        self.assertIn("function formatRuntimeDuration(startedAt)", PAPER_HTML)
+        self.assertIn("return `${days} 天${hours} 小时${minutes} 分`;", PAPER_HTML)
 
     def test_runtime_api_exposes_commit_and_paper_page_markers(self) -> None:
         data = main.system_runtime()

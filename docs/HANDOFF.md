@@ -764,6 +764,16 @@ chmod +x start.sh scripts/diagnose_runtime.sh
   - `python3 -m py_compile app/*.py` 通过。
   - `python3 -m unittest discover -s tests -v`：50 个测试通过。
 
+## 2026-07-05 Paper 顶部已运行时间
+
+- `/paper` 顶部指标区在 `策略周期` 后新增 `已运行时间`。
+- 页面使用 `/api/paper/status` 中 `account.started_at` 与浏览器当前时间计算运行时长，显示为 `N 天N 小时N 分`。
+- 如果账户尚未初始化或缺少 `started_at`，显示 `-`。
+- 顶部指标 grid 从 5 列扩展为 6 列，新增运行时长列使用内容宽度，资金使用率仍占主要弹性空间。
+- 验证：
+  - `python3 -m py_compile app/*.py` 通过。
+  - `python3 -m unittest discover -s tests -v`：51 个测试通过。
+
 ## 2026-07-05 Paper 收益率盈亏颜色更新
 
 - `/paper` 的 `交易记录` 和 `最近平仓` 共用同一个 `tradeRow()` 渲染函数。

@@ -792,7 +792,7 @@ PAPER_HTML = """
     .ticker-change, .clock-value { font-size:13px; }
     .nav { display:flex; gap:10px; align-items:center; }
     a, button { border:1px solid #3b4654; background:#202733; color:var(--text); border-radius:6px; padding:9px 12px; text-decoration:none; cursor:pointer; font-weight:650; }
-    .grid { display:grid; grid-template-columns:minmax(150px,max-content) minmax(140px,max-content) minmax(92px,max-content) minmax(560px,1fr) minmax(210px,max-content); border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--panel); align-items:stretch; }
+    .grid { display:grid; grid-template-columns:minmax(150px,max-content) minmax(140px,max-content) minmax(92px,max-content) minmax(560px,1fr) minmax(210px,max-content) minmax(150px,max-content); border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--panel); align-items:stretch; }
     .metric { padding:14px 18px; border-right:1px solid var(--line); min-width:0; }
     .metric:last-child { border-right:0; }
     .metric span { display:block; color:var(--muted); font-size:12px; margin-bottom:7px; }
@@ -851,6 +851,7 @@ PAPER_HTML = """
         </div>
       </div>
       <div class="metric"><span>策略周期</span><strong id="strategyIntervals">-</strong></div>
+      <div class="metric"><span>已运行时间</span><strong id="runtimeDuration">-</strong></div>
     </section>
     <section class="panel">
       <h2>当前持仓</h2>
@@ -887,6 +888,7 @@ async function loadStatus() {
   document.getElementById('equity').textContent = Number(account.equity || 0).toFixed(2);
   document.getElementById('initial').textContent = Number(account.initial_equity || 1000).toFixed(2);
   document.getElementById('compound').textContent = account.compound ? 'YES' : 'NO';
+  document.getElementById('runtimeDuration').textContent = formatRuntimeDuration(account.started_at);
   fillCapitalAllocation(data.capital_allocation || {});
   updateStrategyIntervals(data.strategies || []);
   fillStrategies(data.strategies || []);
@@ -1037,6 +1039,14 @@ function updateStrategyIntervals(strategies) {
   const active = new Set(strategies.filter(s => s.enabled).map(s => s.interval));
   const ordered = intervalOrder.filter(interval => active.has(interval));
   document.getElementById('strategyIntervals').textContent = ordered.length ? ordered.join(' / ') : '-';
+}
+function formatRuntimeDuration(startedAt) {
+  if (!startedAt) return '-';
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - Number(startedAt)) / 60000));
+  const days = Math.floor(elapsedMinutes / 1440);
+  const hours = Math.floor((elapsedMinutes % 1440) / 60);
+  const minutes = elapsedMinutes % 60;
+  return `${days} 天${hours} 小时${minutes} 分`;
 }
 function fillCapitalAllocation(allocation) {
   const symbols = allocation.symbols || {};
