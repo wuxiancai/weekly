@@ -359,6 +359,10 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("updateStrategyIntervals(data.strategies || []);", PAPER_HTML)
         self.assertIn("function updateStrategyIntervals(strategies)", PAPER_HTML)
         self.assertIn("intervalOrder = ['1w', '1d', '4h', '1h'];", PAPER_HTML)
+        self.assertIn("ordered.slice(0, 2)", PAPER_HTML)
+        self.assertIn("ordered.slice(2, 4)", PAPER_HTML)
+        self.assertIn('class="strategy-interval-line"', PAPER_HTML)
+        self.assertIn("${row.join('/')}", PAPER_HTML)
         self.assertNotIn("<strong>1d / 4h / 1h</strong>", PAPER_HTML)
 
     def test_paper_page_allows_capital_allocation_edits_and_explains_params_on_hover(self) -> None:
@@ -379,9 +383,10 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn(".allocation-controls button { flex:0 0 auto;", PAPER_HTML)
 
     def test_paper_summary_shows_runtime_duration_after_strategy_intervals(self) -> None:
-        self.assertIn('<div class="metric"><span>策略周期</span><strong id="strategyIntervals">-</strong></div>', PAPER_HTML)
+        self.assertIn('<div class="metric"><span>策略周期</span><strong id="strategyIntervals" class="strategy-intervals">-</strong></div>', PAPER_HTML)
         self.assertIn('<div class="metric"><span>已运行时间</span><strong id="runtimeDuration">-</strong></div>', PAPER_HTML)
         self.assertLess(PAPER_HTML.index('id="strategyIntervals"'), PAPER_HTML.index('id="runtimeDuration"'))
+        self.assertIn(".strategy-intervals { display:grid; gap:2px; font-size:18px;", PAPER_HTML)
         self.assertIn("formatRuntimeDuration(account.started_at)", PAPER_HTML)
         self.assertIn("function formatRuntimeDuration(startedAt)", PAPER_HTML)
         self.assertIn("return `${days} 天${hours} 小时${minutes} 分`;", PAPER_HTML)

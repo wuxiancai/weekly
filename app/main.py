@@ -797,6 +797,8 @@ PAPER_HTML = """
     .metric:last-child { border-right:0; }
     .metric span { display:block; color:var(--muted); font-size:12px; margin-bottom:7px; }
     .metric strong { font-size:22px; }
+    .strategy-intervals { display:grid; gap:2px; font-size:18px; line-height:1.12; white-space:nowrap; }
+    .strategy-interval-line { display:block; }
     .allocation-controls { display:flex; flex-wrap:nowrap; gap:8px; align-items:end; }
     .allocation-controls label { display:grid; gap:3px; color:var(--muted); font-size:10px; }
     .allocation-controls input { width:64px; min-width:0; border:1px solid var(--line); background:#0d1015; color:var(--text); border-radius:5px; padding:6px; font-size:12px; }
@@ -850,7 +852,7 @@ PAPER_HTML = """
           <button onclick="saveCapitalAllocation()">保存资金</button>
         </div>
       </div>
-      <div class="metric"><span>策略周期</span><strong id="strategyIntervals">-</strong></div>
+      <div class="metric"><span>策略周期</span><strong id="strategyIntervals" class="strategy-intervals">-</strong></div>
       <div class="metric"><span>已运行时间</span><strong id="runtimeDuration">-</strong></div>
     </section>
     <section class="panel">
@@ -1038,7 +1040,10 @@ function updateStrategyIntervals(strategies) {
   const intervalOrder = ['1w', '1d', '4h', '1h'];
   const active = new Set(strategies.filter(s => s.enabled).map(s => s.interval));
   const ordered = intervalOrder.filter(interval => active.has(interval));
-  document.getElementById('strategyIntervals').textContent = ordered.length ? ordered.join(' / ') : '-';
+  const rows = [ordered.slice(0, 2), ordered.slice(2, 4)].filter(row => row.length);
+  document.getElementById('strategyIntervals').innerHTML = rows.length
+    ? rows.map(row => `<span class="strategy-interval-line">${row.join('/')}</span>`).join('')
+    : '-';
 }
 function formatRuntimeDuration(startedAt) {
   if (!startedAt) return '-';

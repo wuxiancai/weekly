@@ -1,5 +1,13 @@
 # Handoff
 
+## 2026-07-05 Paper 页面策略周期布局
+
+- `/paper` 顶部汇总卡片里的“策略周期”已从单行大字改为两行小字显示：
+  - `1w/1d`
+  - `4h/1h`
+- 样式位于 `app/main.py` 的 `PAPER_HTML`，`strategyIntervals` 使用 `strategy-intervals` / `strategy-interval-line` 类，字号为 `18px`。
+- `updateStrategyIntervals()` 仍从 `/api/paper/status` 的启用策略动态推导周期，只改变展示分组，不改变策略运行逻辑。
+
 ## 2026-07-05 一键停止脚本
 
 - 新增根目录 `stop.sh`，用于只停止、不启动本项目运行态。
