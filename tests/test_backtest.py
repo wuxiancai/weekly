@@ -58,8 +58,13 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("收益回撤比", HTML)
 
     def test_page_shows_previous_backtest_result_between_metrics_and_chart(self) -> None:
-        self.assertLess(HTML.index('class="grid"'), HTML.index('id="previousBacktestPanel"'))
+        self.assertLess(HTML.index('class="grid"'), HTML.index('id="currentBacktestPanel"'))
+        self.assertLess(HTML.index('id="currentBacktestPanel"'), HTML.index('id="previousBacktestPanel"'))
         self.assertLess(HTML.index('id="previousBacktestPanel"'), HTML.index('class="panel chart-wrap"'))
+        self.assertIn("当前回测参数", HTML)
+        self.assertIn('id="currentBacktestMeta"', HTML)
+        self.assertIn("fillCurrentBacktest(data);", HTML)
+        self.assertIn("function fillCurrentBacktest(result)", HTML)
         self.assertIn("上一次回测结果", HTML)
         self.assertIn('id="prevFinalEquity"', HTML)
         self.assertIn('id="prevReturnPct"', HTML)
@@ -68,6 +73,8 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("previousResult = lastResult;", HTML)
         self.assertIn("fillPreviousBacktest(previousResult);", HTML)
         self.assertIn("function fillPreviousBacktest(result)", HTML)
+        self.assertIn("当前回测参数", ETH_HTML)
+        self.assertIn('id="currentBacktestPanel"', ETH_HTML)
         self.assertIn("上一次回测结果", ETH_HTML)
         self.assertIn('id="previousBacktestPanel"', ETH_HTML)
 

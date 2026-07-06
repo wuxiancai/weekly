@@ -365,7 +365,8 @@ HTML = """
     .previous-cell:last-child { border-right:0; }
     .previous-cell span { display:block; color:var(--muted); font-size:12px; margin-bottom:5px; }
     .previous-cell strong { font-size:18px; }
-    .previous-meta { color:var(--muted); font-size:12px; line-height:1.55; }
+    .current-backtest-meta, .previous-meta { color:var(--muted); font-size:12px; line-height:1.55; }
+    .current-backtest-title { color:var(--text); font-weight:700; margin-right:8px; }
     .formula { color:var(--muted); font-size:12px; line-height:1.6; margin:4px 0 12px; }
     .formula a { color:var(--blue); text-decoration:none; }
     @media (max-width: 980px) { .toolbar { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -447,6 +448,7 @@ HTML = """
       <div class="metric"><span>交易次数</span><strong id="tradeCount">-</strong></div>
       <div class="metric"><span>收益回撤比</span><strong id="rdd">-</strong></div>
     </section>
+    <section class="panel current-backtest-meta" id="currentBacktestPanel"><span class="current-backtest-title">当前回测参数</span><span id="currentBacktestMeta">运行回测后显示当前参数。</span></section>
     <section class="panel previous-backtest" id="previousBacktestPanel">
       <div class="previous-head">
         <h2>上一次回测结果</h2>
@@ -682,6 +684,7 @@ async function runBacktest() {
   lastResult = data;
   candles = data.candles || candles;
   fillMetrics(data.metrics);
+  fillCurrentBacktest(data);
   fillPreviousBacktest(previousResult);
   fillTrades(data.trades);
   drawChart(candles, data.trades);
@@ -715,6 +718,16 @@ function fillMetrics(m) {
   document.getElementById('winRate').textContent = `${Number(m.win_rate_pct).toFixed(2)}%`;
   document.getElementById('tradeCount').textContent = m.trade_count;
   document.getElementById('rdd').textContent = Number(m.return_drawdown_ratio).toFixed(2);
+}
+
+function fillCurrentBacktest(result) {
+  if (!result || !result.metrics) {
+    document.getElementById('currentBacktestMeta').textContent = '运行回测后显示当前参数。';
+    return;
+  }
+  const request = result.request || payload();
+  const params = result.params || request.params || {};
+  document.getElementById('currentBacktestMeta').textContent = `${request.symbol} ${request.interval}，参数：${paramSummary(params)}`;
 }
 
 function fillPreviousBacktest(result) {
