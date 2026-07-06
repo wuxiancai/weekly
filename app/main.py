@@ -393,7 +393,7 @@ HTML = """
   <main>
     <section class="toolbar">
       <label title="交易标的。推荐：BTCUSDT。此处固定按 Binance USDⓈ-M / U本位永续合约理解，不是币本位合约。">交易对<input id="symbol" value="BTCUSDT"></label>
-      <label title="K 线周期。推荐：周线 1w；切换到 1d/4h/1h 时会自动套用当前交易对的独立周期默认参数。">周期<select id="interval" onchange="applyIntervalDefaults()"><option value="1w" selected>1w</option><option value="1d">1d</option><option value="4h">4h</option><option value="1h">1h</option></select></label>
+      <label title="K 线周期。推荐：周线 1w；切换到 1d/4h/1h/15m 时会自动套用当前交易对的独立周期默认参数。">周期<select id="interval" onchange="applyIntervalDefaults()"><option value="1w" selected>1w</option><option value="1d">1d</option><option value="4h">4h</option><option value="1h">1h</option><option value="15m">15m</option></select></label>
       <label title="回测开始日期。推荐：2019-09-02；交易只从该日期后开始，指标可用之前历史预热。">开始日期<input id="start" value="2019-09-02"></label>
       <label title="回测结束日期。推荐：2026-06-29。">结束日期<input id="end" value="2026-06-29"></label>
       <label title="初始本金。复利=NO 时每笔按该固定本金开仓；复利=YES 时第一笔用该本金，之后按当前权益开仓。推荐：10000。">本金<input id="initialEquity" type="number" step="100" value="10000"></label>
@@ -417,7 +417,7 @@ HTML = """
       <label title="动态止盈最高 ATR 倍数上限。推荐：32。">止盈上限<input id="takeAtrMax" type="number" step="0.5" value="32"></label>
       <label title="动态止盈保护位缓冲比例。推荐：0。">止盈缓冲<input id="takeAtrBuffer" type="number" step="0.01" value="0"></label>
       <label title="成交量过滤倍数，当前量需大于成交量均线乘以该值。推荐：1。">量能倍数<input id="volumeMult" type="number" step="0.05" value="1"></label>
-      <label title="盘中状态切换策略。YES：先识别 TREND/RANGE/NEUTRAL，趋势市顺势，震荡市均值回归，过渡市少交易。推荐：1h/4h YES，周线/日线 NO。">状态策略<select id="regimeSwitch"><option value="false" selected>NO</option><option value="true">YES</option></select></label>
+      <label title="盘中状态切换策略。YES：先识别 TREND/RANGE/NEUTRAL，趋势市顺势，震荡市均值回归，过渡市少交易。推荐：15m/1h/4h YES，周线/日线 NO。">状态策略<select id="regimeSwitch"><option value="false" selected>NO</option><option value="true">YES</option></select></label>
       <label title="趋势状态要求 EMA 与 MA 至少分离的比例。推荐：1h/4h 0。">趋势间距<input id="trendMaGapMin" type="number" step="0.001" value="0.006"></label>
       <label title="震荡状态 ADX 上限。低于该值且布林带收窄时按震荡处理。推荐：18。">震荡ADX<input id="rangeAdxMax" type="number" step="1" value="18"></label>
       <label title="震荡状态布林带宽上限，(上轨-下轨)/中轨。推荐：0.08。">震荡带宽<input id="rangeBbWidthMax" type="number" step="0.005" value="0.08"></label>
@@ -491,6 +491,13 @@ const STRATEGY_DEFAULTS = {
       adxPeriod: 14, adx: 18, longRsiMin: 55, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
       stopAtr: 0.45, takeAtr: 4.0, takeAtrStep: 1.0, takeAtrMax: 12.0, takeAtrBuffer: 0, volumeMult: 1.25,
       regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 22, rangeBbWidthMax: 0.05, rangeRsiLow: 35, rangeRsiHigh: 65
+    },
+    '15m': {
+      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 15, ma: 50, rsiPeriod: 14, atrPeriod: 14,
+      adxPeriod: 14, adx: 45, longRsiMin: 55, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 0.8, takeAtr: 6.0, takeAtrStep: 1.0, takeAtrMax: 16.0, takeAtrBuffer: 0, volumeMult: 1.5,
+      regimeSwitch: true, trendMaGapMin: 0.003, rangeAdxMax: 18, rangeBbWidthMax: 0.04, rangeRsiLow: 25, rangeRsiHigh: 70
     }
   },
   ETHUSDT: {
@@ -521,6 +528,13 @@ const STRATEGY_DEFAULTS = {
       adxPeriod: 14, adx: 25, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
       stopAtr: 0.45, takeAtr: 1.8, takeAtrStep: 0.5, takeAtrMax: 4, takeAtrBuffer: 0, volumeMult: 1,
       regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 22, rangeBbWidthMax: 0.12, rangeRsiLow: 30, rangeRsiHigh: 65
+    },
+    '15m': {
+      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 21, ma: 60, rsiPeriod: 14, atrPeriod: 14,
+      adxPeriod: 14, adx: 35, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 0.8, takeAtr: 6.0, takeAtrStep: 1.0, takeAtrMax: 16.0, takeAtrBuffer: 0, volumeMult: 1.25,
+      regimeSwitch: true, trendMaGapMin: 0.0015, rangeAdxMax: 18, rangeBbWidthMax: 0.04, rangeRsiLow: 25, rangeRsiHigh: 70
     }
   }
 };
@@ -850,7 +864,7 @@ PAPER_HTML = """
     .symbol-btc, .interval-1w { color:var(--blue); font-weight:700; }
     .interval-1d { color:var(--red); font-weight:700; }
     .interval-4h { color:var(--purple); font-weight:700; }
-    .interval-1h { color:var(--yellow); font-weight:700; }
+    .interval-1h, .interval-15m { color:var(--yellow); font-weight:700; }
     @media (max-width: 900px) { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .trigger-grid, .trigger-items { grid-template-columns:1fr; } header { align-items:stretch; flex-direction:column; gap:12px; } .market-ticker { min-width:0; max-width:none; width:100%; padding:8px 10px; } .ticker-row { justify-content:flex-start; gap:9px; overflow:auto; -webkit-overflow-scrolling:touch; } .ticker-item { gap:4px; } .ticker-label, .clock-label { font-size:11px; } .ticker-price { font-size:14px; } .ticker-change, .clock-value { font-size:12px; } }
     @media (max-width: 640px) {
       header { padding:14px 12px; }
@@ -902,6 +916,7 @@ PAPER_HTML = """
         <div class="allocation-controls">
           <label>BTC<input id="allocSymbolBTCUSDT" type="number" min="0" max="100" step="1"></label>
           <label>ETH<input id="allocSymbolETHUSDT" type="number" min="0" max="100" step="1"></label>
+          <label>15m<input id="allocInterval15m" type="number" min="0" max="100" step="1"></label>
           <label>1h<input id="allocInterval1h" type="number" min="0" max="100" step="1"></label>
           <label>4h<input id="allocInterval4h" type="number" min="0" max="100" step="1"></label>
           <label>1d<input id="allocInterval1d" type="number" min="0" max="100" step="1"></label>
@@ -1091,7 +1106,7 @@ function formatDateTime(ms) {
 }
 function date(ms) { return formatDateTime(ms); }
 function intervalMs(interval) {
-  return { '1h': 60 * 60 * 1000, '4h': 4 * 60 * 60 * 1000, '1d': 24 * 60 * 60 * 1000, '1w': 7 * 24 * 60 * 60 * 1000 }[String(interval || '').toLowerCase()] || 0;
+  return { '15m': 15 * 60 * 1000, '1h': 60 * 60 * 1000, '4h': 4 * 60 * 60 * 1000, '1d': 24 * 60 * 60 * 1000, '1w': 7 * 24 * 60 * 60 * 1000 }[String(interval || '').toLowerCase()] || 0;
 }
 function lastProcessedCloseTime(strategy) {
   if (strategy.last_processed_close_time) return strategy.last_processed_close_time;
@@ -1102,7 +1117,7 @@ function lastProcessedCloseTime(strategy) {
 function symbolClass(value) { return String(value || '').toUpperCase() === 'BTCUSDT' ? 'symbol-btc' : ''; }
 function intervalClass(value) {
   const normalized = String(value || '').toLowerCase();
-  return ['1w', '1d', '4h', '1h'].includes(normalized) ? `interval-${normalized}` : '';
+  return ['1w', '1d', '4h', '1h', '15m'].includes(normalized) ? `interval-${normalized}` : '';
 }
 function symbolCell(value) { return `<span class="${symbolClass(value)}">${value || '-'}</span>`; }
 function intervalCell(value) { return `<span class="${intervalClass(value)}">${value || '-'}</span>`; }
@@ -1127,10 +1142,10 @@ function safeJsonParse(value) {
   try { return JSON.parse(value); } catch (_) { return value; }
 }
 function updateStrategyIntervals(strategies) {
-  const intervalOrder = ['1w', '1d', '4h', '1h'];
+  const intervalOrder = ['1w', '1d', '4h', '1h', '15m'];
   const active = new Set(strategies.filter(s => s.enabled).map(s => s.interval));
   const ordered = intervalOrder.filter(interval => active.has(interval));
-  const rows = [ordered.slice(0, 2), ordered.slice(2, 4)].filter(row => row.length);
+  const rows = [ordered.slice(0, 2), ordered.slice(2, 5)].filter(row => row.length);
   document.getElementById('strategyIntervals').innerHTML = rows.length
     ? rows.map(row => `<span class="strategy-interval-line">${row.join('/')}</span>`).join('')
     : '-';
@@ -1148,6 +1163,7 @@ function fillCapitalAllocation(allocation) {
   const intervals = allocation.intervals || {};
   setInputValue('allocSymbolBTCUSDT', symbols.BTCUSDT);
   setInputValue('allocSymbolETHUSDT', symbols.ETHUSDT);
+  setInputValue('allocInterval15m', intervals['15m']);
   setInputValue('allocInterval1h', intervals['1h']);
   setInputValue('allocInterval4h', intervals['4h']);
   setInputValue('allocInterval1d', intervals['1d']);
@@ -1164,6 +1180,7 @@ function readCapitalAllocation() {
       ETHUSDT: Number(document.getElementById('allocSymbolETHUSDT').value || 0),
     },
     intervals: {
+      '15m': Number(document.getElementById('allocInterval15m').value || 0),
       '1h': Number(document.getElementById('allocInterval1h').value || 0),
       '4h': Number(document.getElementById('allocInterval4h').value || 0),
       '1d': Number(document.getElementById('allocInterval1d').value || 0),
@@ -1178,7 +1195,7 @@ function fillStrategies(items) {
 }
 function fillTriggerConditions(items) {
   const symbolOrder = ['BTCUSDT', 'ETHUSDT'];
-  const intervalOrder = ['1w', '1d', '4h', '1h'];
+  const intervalOrder = ['1w', '1d', '4h', '1h', '15m'];
   const bySymbol = items.reduce((acc, item) => {
     (acc[item.symbol] = acc[item.symbol] || []).push(item);
     return acc;
@@ -1196,7 +1213,7 @@ function fillTriggerConditions(items) {
     }).join('');
     return `<div class="trigger-card">
       <h3>${symbolCell(symbol)} 已满足 ${satisfied}/${rows.length || intervalOrder.length}</h3>
-      <p>4 个周期独立判断，某个周期满足只影响该周期自己的模拟交易。</p>
+      <p>5 个周期独立判断，某个周期满足只影响该周期自己的模拟交易。</p>
       <div class="trigger-items">${cells}</div>
     </div>`;
   }).join('');
@@ -1276,7 +1293,7 @@ ETH_HTML = (
     .replace("const PAGE_SYMBOL = 'BTCUSDT';", "const PAGE_SYMBOL = 'ETHUSDT';")
     .replace("const PAGE_INTERVAL = '1w';", "const PAGE_INTERVAL = '1d';")
     .replace("周期 1w", "周期 1d")
-    .replace('<option value="1w" selected>1w</option><option value="1d">1d</option><option value="4h">4h</option><option value="1h">1h</option>', '<option value="1w">1w</option><option value="1d" selected>1d</option><option value="4h">4h</option><option value="1h">1h</option>')
+    .replace('<option value="1w" selected>1w</option><option value="1d">1d</option><option value="4h">4h</option><option value="1h">1h</option><option value="15m">15m</option>', '<option value="1w">1w</option><option value="1d" selected>1d</option><option value="4h">4h</option><option value="1h">1h</option><option value="15m">15m</option>')
     .replace("动态止盈启动 ATR 倍数。推荐：7.5", "动态止盈启动 ATR 倍数。推荐：6.5")
     .replace('id="takeAtr" type="number" step="0.1" value="7.5"', 'id="takeAtr" type="number" step="0.1" value="6.5"')
     .replace("动态止盈最高 ATR 倍数上限。推荐：32", "动态止盈最高 ATR 倍数上限。推荐：24")

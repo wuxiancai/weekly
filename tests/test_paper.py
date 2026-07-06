@@ -27,10 +27,12 @@ class PaperTradingTests(unittest.TestCase):
                 ("BTCUSDT", "1d"),
                 ("BTCUSDT", "4h"),
                 ("BTCUSDT", "1h"),
+                ("BTCUSDT", "15m"),
                 ("ETHUSDT", "1w"),
                 ("ETHUSDT", "1d"),
                 ("ETHUSDT", "4h"),
                 ("ETHUSDT", "1h"),
+                ("ETHUSDT", "15m"),
             ],
         )
         params_by_key = {(s.symbol, s.interval): s.params for s in strategies}
@@ -56,6 +58,18 @@ class PaperTradingTests(unittest.TestCase):
         self.assertEqual(params_by_key[("ETHUSDT", "1h")].ma_period, 50)
         self.assertEqual(params_by_key[("ETHUSDT", "1h")].take_atr, 1.8)
         self.assertEqual(params_by_key[("ETHUSDT", "1h")].range_bb_width_max, 0.12)
+        self.assertTrue(params_by_key[("BTCUSDT", "15m")].regime_switch)
+        self.assertEqual(params_by_key[("BTCUSDT", "15m")].ema_period, 15)
+        self.assertEqual(params_by_key[("BTCUSDT", "15m")].ma_period, 50)
+        self.assertEqual(params_by_key[("BTCUSDT", "15m")].adx_min, 45)
+        self.assertEqual(params_by_key[("BTCUSDT", "15m")].take_atr_max, 16.0)
+        self.assertEqual(params_by_key[("BTCUSDT", "15m")].trend_ma_gap_min, 0.003)
+        self.assertTrue(params_by_key[("ETHUSDT", "15m")].regime_switch)
+        self.assertEqual(params_by_key[("ETHUSDT", "15m")].ema_period, 21)
+        self.assertEqual(params_by_key[("ETHUSDT", "15m")].ma_period, 60)
+        self.assertEqual(params_by_key[("ETHUSDT", "15m")].adx_min, 35)
+        self.assertEqual(params_by_key[("ETHUSDT", "15m")].take_atr_max, 16.0)
+        self.assertEqual(params_by_key[("ETHUSDT", "15m")].trend_ma_gap_min, 0.0015)
 
     def test_paper_engine_initializes_account_and_strategies_once(self) -> None:
         conn = sqlite3.connect(":memory:")
@@ -71,7 +85,7 @@ class PaperTradingTests(unittest.TestCase):
 
         self.assertEqual(account["initial_equity"], 1000.0)
         self.assertEqual(account["equity"], 1000.0)
-        self.assertEqual(len(strategies), 8)
+        self.assertEqual(len(strategies), 10)
 
     def test_paper_engine_syncs_existing_strategy_params_to_code_defaults(self) -> None:
         conn = sqlite3.connect(":memory:")
@@ -139,7 +153,7 @@ class PaperTradingTests(unittest.TestCase):
 
         allocation = status["capital_allocation"]
         self.assertEqual(allocation["symbols"], {"BTCUSDT": 80.0, "ETHUSDT": 20.0})
-        self.assertEqual(allocation["intervals"], {"1h": 30.0, "4h": 40.0, "1d": 20.0, "1w": 10.0})
+        self.assertEqual(allocation["intervals"], {"15m": 0.0, "1h": 30.0, "4h": 40.0, "1d": 20.0, "1w": 10.0})
         slots = {(row["symbol"], row["interval"]): row for row in allocation["slots"]}
         self.assertEqual(slots[("BTCUSDT", "4h")]["allocated_margin"], 320.0)
         self.assertEqual(slots[("ETHUSDT", "4h")]["allocated_margin"], 80.0)
@@ -204,7 +218,7 @@ class PaperTradingTests(unittest.TestCase):
         )
         conn.commit()
 
-        engine.update_capital_allocation({"BTCUSDT": 70.0, "ETHUSDT": 30.0}, {"1h": 30.0, "4h": 40.0, "1d": 20.0, "1w": 10.0})
+        engine.update_capital_allocation({"BTCUSDT": 70.0, "ETHUSDT": 30.0}, {"15m": 0.0, "1h": 30.0, "4h": 40.0, "1d": 20.0, "1w": 10.0})
 
         slot = next(row for row in engine.status()["capital_allocation"]["slots"] if row["symbol"] == "ETHUSDT" and row["interval"] == "4h")
         self.assertEqual(slot["allocated_margin"], 120.0)
@@ -388,14 +402,15 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("interval-1d", PAPER_HTML)
         self.assertIn("interval-4h", PAPER_HTML)
         self.assertIn("interval-1h", PAPER_HTML)
+        self.assertIn("interval-15m", PAPER_HTML)
 
     def test_paper_page_derives_strategy_intervals_from_status(self) -> None:
         self.assertIn('id="strategyIntervals"', PAPER_HTML)
         self.assertIn("updateStrategyIntervals(data.strategies || []);", PAPER_HTML)
         self.assertIn("function updateStrategyIntervals(strategies)", PAPER_HTML)
-        self.assertIn("intervalOrder = ['1w', '1d', '4h', '1h'];", PAPER_HTML)
+        self.assertIn("intervalOrder = ['1w', '1d', '4h', '1h', '15m'];", PAPER_HTML)
         self.assertIn("ordered.slice(0, 2)", PAPER_HTML)
-        self.assertIn("ordered.slice(2, 4)", PAPER_HTML)
+        self.assertIn("ordered.slice(2, 5)", PAPER_HTML)
         self.assertIn('class="strategy-interval-line"', PAPER_HTML)
         self.assertIn("${row.join('/')}", PAPER_HTML)
         self.assertNotIn("<strong>1d / 4h / 1h</strong>", PAPER_HTML)
@@ -404,6 +419,7 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn('id="capitalAllocation"', PAPER_HTML)
         self.assertIn('id="allocSymbolBTCUSDT"', PAPER_HTML)
         self.assertIn('id="allocSymbolETHUSDT"', PAPER_HTML)
+        self.assertIn('id="allocInterval15m"', PAPER_HTML)
         self.assertIn('id="allocInterval4h"', PAPER_HTML)
         self.assertIn("saveCapitalAllocation()", PAPER_HTML)
         self.assertIn("fetch('/api/paper/capital-allocation'", PAPER_HTML)
@@ -452,7 +468,7 @@ class PaperTradingTests(unittest.TestCase):
         data = engine.status()
 
         self.assertIn("trigger_conditions", data)
-        self.assertEqual(len(data["trigger_conditions"]), 8)
+        self.assertEqual(len(data["trigger_conditions"]), 10)
         first = data["trigger_conditions"][0]
         self.assertIn("symbol", first)
         self.assertIn("interval", first)

@@ -9,6 +9,7 @@ from .paper import PaperEngine, init_paper_schema, paper_strategy_defaults
 
 
 INTERVAL_MS = {
+    "15m": 15 * 60 * 1000,
     "1h": 60 * 60 * 1000,
     "4h": 4 * 60 * 60 * 1000,
     "1d": 24 * 60 * 60 * 1000,

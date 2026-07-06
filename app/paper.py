@@ -23,8 +23,9 @@ PAPER_DEFAULT_LEVERAGE = 0.0
 PAPER_DEFAULT_FEE_RATE = 0.0005
 PAPER_DEFAULT_SLIPPAGE_RATE = 0.0005
 PAPER_DEFAULT_SYMBOL_ALLOCATIONS = {"BTCUSDT": 80.0, "ETHUSDT": 20.0}
-PAPER_DEFAULT_INTERVAL_ALLOCATIONS = {"1h": 30.0, "4h": 40.0, "1d": 20.0, "1w": 10.0}
+PAPER_DEFAULT_INTERVAL_ALLOCATIONS = {"15m": 0.0, "1h": 30.0, "4h": 40.0, "1d": 20.0, "1w": 10.0}
 INTERVAL_MS = {
+    "15m": 15 * 60 * 1000,
     "1h": 60 * 60 * 1000,
     "4h": 4 * 60 * 60 * 1000,
     "1d": 24 * 60 * 60 * 1000,
@@ -101,15 +102,19 @@ def paper_strategy_defaults() -> list[PaperStrategyConfig]:
     four_hour = _intraday_regime_params()
     btc_one_hour = _btc_one_hour_params()
     eth_one_hour = _eth_one_hour_params()
+    btc_fifteen_min = _btc_fifteen_min_params()
+    eth_fifteen_min = _eth_fifteen_min_params()
     return [
         PaperStrategyConfig("BTCUSDT", "1w", weekly),
         PaperStrategyConfig("BTCUSDT", "1d", btc_daily),
         PaperStrategyConfig("BTCUSDT", "4h", four_hour),
         PaperStrategyConfig("BTCUSDT", "1h", btc_one_hour),
+        PaperStrategyConfig("BTCUSDT", "15m", btc_fifteen_min),
         PaperStrategyConfig("ETHUSDT", "1w", weekly),
         PaperStrategyConfig("ETHUSDT", "1d", eth_daily),
         PaperStrategyConfig("ETHUSDT", "4h", four_hour),
         PaperStrategyConfig("ETHUSDT", "1h", eth_one_hour),
+        PaperStrategyConfig("ETHUSDT", "15m", eth_fifteen_min),
     ]
 
 
@@ -218,6 +223,60 @@ def _eth_one_hour_params() -> StrategyParams:
         range_bb_width_max=0.12,
         range_rsi_low=30,
         range_rsi_high=65,
+    )
+
+
+def _btc_fifteen_min_params() -> StrategyParams:
+    return StrategyParams(
+        ema_period=15,
+        ma_period=50,
+        rsi_period=14,
+        atr_period=14,
+        adx_period=14,
+        adx_min=45,
+        long_rsi_min=55,
+        long_rsi_max=85,
+        short_rsi_min=0,
+        short_rsi_max=100,
+        stop_atr=0.8,
+        take_atr=6.0,
+        take_atr_step=1.0,
+        take_atr_max=16.0,
+        take_atr_buffer_pct=0.0,
+        volume_mult=1.5,
+        regime_switch=True,
+        trend_ma_gap_min=0.003,
+        range_adx_max=18,
+        range_bb_width_max=0.04,
+        range_rsi_low=25,
+        range_rsi_high=70,
+    )
+
+
+def _eth_fifteen_min_params() -> StrategyParams:
+    return StrategyParams(
+        ema_period=21,
+        ma_period=60,
+        rsi_period=14,
+        atr_period=14,
+        adx_period=14,
+        adx_min=35,
+        long_rsi_min=50,
+        long_rsi_max=80,
+        short_rsi_min=0,
+        short_rsi_max=100,
+        stop_atr=0.8,
+        take_atr=6.0,
+        take_atr_step=1.0,
+        take_atr_max=16.0,
+        take_atr_buffer_pct=0.0,
+        volume_mult=1.25,
+        regime_switch=True,
+        trend_ma_gap_min=0.0015,
+        range_adx_max=18,
+        range_bb_width_max=0.04,
+        range_rsi_low=25,
+        range_rsi_high=70,
     )
 
 
