@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import sqlite3
 import time
@@ -19,7 +21,8 @@ from .strategy import StrategyParams, enrich_candles, market_regime_for, params_
 
 PAPER_DEFAULT_INITIAL_EQUITY = 1000.0
 PAPER_DEFAULT_COMPOUND = True
-PAPER_DEFAULT_LEVERAGE = 0.0
+PAPER_DEFAULT_LEVERAGE = 2.0
+PAPER_INITIAL_SETTINGS_PASSWORD = "123456"
 PAPER_DEFAULT_FEE_RATE = 0.0005
 PAPER_DEFAULT_SLIPPAGE_RATE = 0.0005
 PAPER_DEFAULT_SYMBOL_ALLOCATIONS = {"BTCUSDT": 80.0, "ETHUSDT": 20.0}
@@ -313,6 +316,13 @@ def init_paper_schema(conn: Any) -> None:
             PRIMARY KEY (scope, key)
         );
 
+        CREATE TABLE IF NOT EXISTS paper_security_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            password_hash TEXT NOT NULL,
+            password_is_default INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS paper_positions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             symbol TEXT NOT NULL,
@@ -448,6 +458,18 @@ class PaperEngine:
                 VALUES ('interval', ?, ?, ?)
                 """,
                 (interval, pct, now),
+            )
+        security_insert = self.conn.execute(
+            """
+            INSERT OR IGNORE INTO paper_security_settings(id, password_hash, password_is_default, updated_at)
+            VALUES (1, ?, 1, ?)
+            """,
+            (_password_hash(PAPER_INITIAL_SETTINGS_PASSWORD), now),
+        )
+        if security_insert.rowcount == 1:
+            self.conn.execute(
+                "UPDATE paper_accounts SET leverage = ?, updated_at = ? WHERE id = 1 AND leverage = 0",
+                (PAPER_DEFAULT_LEVERAGE, now),
             )
         self.conn.commit()
 
@@ -588,7 +610,13 @@ class PaperEngine:
             "events": events,
             "equity_curve": list(reversed(curves)),
             "capital_allocation": self._capital_allocation_status(account, strategies),
+            "security": self.security_status(),
         }
+
+    def security_status(self) -> dict[str, Any]:
+        self.initialize()
+        row = self.conn.execute("SELECT password_is_default FROM paper_security_settings WHERE id = 1").fetchone()
+        return {"password_change_required": bool(row["password_is_default"]) if row is not None else True}
 
     def update_capital_allocation(self, symbols: dict[str, float], intervals: dict[str, float]) -> None:
         symbol_values = self._validated_allocation("symbol", symbols, PAPER_DEFAULT_SYMBOL_ALLOCATIONS)
@@ -614,6 +642,29 @@ class PaperEngine:
             )
         self.conn.commit()
 
+    def update_capital_settings(self, symbols: dict[str, float], intervals: dict[str, float], leverage: float) -> None:
+        leverage_value = self._validated_leverage(leverage)
+        self.update_capital_allocation(symbols, intervals)
+        self.conn.execute("UPDATE paper_accounts SET leverage = ?, updated_at = ? WHERE id = 1", (leverage_value, _now_ms()))
+        self.conn.commit()
+
+    def save_capital_settings_with_password(
+        self,
+        symbols: dict[str, float],
+        intervals: dict[str, float],
+        leverage: float,
+        password: str,
+        new_password: str | None = None,
+    ) -> None:
+        self._verify_settings_password(password)
+        if self.security_status()["password_change_required"]:
+            if not new_password:
+                raise ValueError("首次保存必须修改初始密码")
+            self._set_settings_password(new_password)
+        elif new_password:
+            self._set_settings_password(new_password)
+        self.update_capital_settings(symbols, intervals, leverage)
+
     def record_event(self, symbol: str, interval: str, event_type: str, payload: dict[str, Any]) -> None:
         now = _now_ms()
         self.conn.execute(
@@ -627,6 +678,23 @@ class PaperEngine:
 
     def _load_account(self) -> Any:
         return self.conn.execute("SELECT * FROM paper_accounts WHERE id = 1").fetchone()
+
+    def _verify_settings_password(self, password: str) -> None:
+        row = self.conn.execute("SELECT password_hash FROM paper_security_settings WHERE id = 1").fetchone()
+        if row is None or not hmac.compare_digest(str(row["password_hash"]), _password_hash(password or "")):
+            raise ValueError("密码错误")
+
+    def _set_settings_password(self, password: str) -> None:
+        normalized = str(password or "")
+        if len(normalized) < 6:
+            raise ValueError("新密码至少 6 位")
+        if normalized == PAPER_INITIAL_SETTINGS_PASSWORD:
+            raise ValueError("新密码不能继续使用初始密码")
+        self.conn.execute(
+            "UPDATE paper_security_settings SET password_hash = ?, password_is_default = 0, updated_at = ? WHERE id = 1",
+            (_password_hash(normalized), _now_ms()),
+        )
+        self.conn.commit()
 
     def _load_strategy(self, symbol: str, interval: str) -> Any:
         return self.conn.execute(
@@ -891,6 +959,7 @@ class PaperEngine:
         symbols = self._allocation_map("symbol", PAPER_DEFAULT_SYMBOL_ALLOCATIONS)
         intervals = self._allocation_map("interval", PAPER_DEFAULT_INTERVAL_ALLOCATIONS)
         equity = float(account["equity"])
+        leverage = float(account["leverage"])
         used = {
             (row["symbol"], row["interval"]): float(row["used_margin"] or 0)
             for row in self.conn.execute(
@@ -918,7 +987,7 @@ class PaperEngine:
                     "available_margin": round(max(0.0, allocated - used_margin), 4),
                 }
             )
-        return {"symbols": symbols, "intervals": intervals, "slots": slots}
+        return {"symbols": symbols, "intervals": intervals, "leverage": leverage, "slots": slots}
 
     def _available_allocation_margin(self, symbol: str, interval: str, account: Any) -> float:
         symbols = self._allocation_map("symbol", PAPER_DEFAULT_SYMBOL_ALLOCATIONS)
@@ -937,6 +1006,15 @@ class PaperEngine:
         for row in rows:
             values[row["key"]] = float(row["pct"])
         return values
+
+    def _validated_leverage(self, leverage: float) -> float:
+        try:
+            value = float(leverage)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("杠杆不是数字") from exc
+        if value < 0 or value > 125:
+            raise ValueError("杠杆必须在 0-125")
+        return value
 
     def _validated_allocation(self, scope: str, values: dict[str, float], defaults: dict[str, float]) -> dict[str, float]:
         normalized: dict[str, float] = {}
@@ -958,6 +1036,10 @@ class PaperEngine:
 
 def _now_ms() -> int:
     return int(time.time() * 1000)
+
+
+def _password_hash(password: str) -> str:
+    return hashlib.sha256(str(password).encode("utf-8")).hexdigest()
 
 
 def _warmup_count(params: StrategyParams) -> int:

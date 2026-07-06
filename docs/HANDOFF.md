@@ -1,5 +1,16 @@
 # Handoff
 
+## 2026-07-07 Paper 资金配置增加全局杠杆和保存密码
+
+- `/paper` 页面在 `保存资金` 按钮前新增 `杠杆` 输入框，默认 `2`，范围 `0-125`，作为 Paper 模拟账户全局杠杆设置；后续新开仓统一按该账户杠杆放大名义仓位。
+- `PAPER_DEFAULT_LEVERAGE` 从 `0.0` 调整为 `2.0`；旧数据库首次升级时如果账户杠杆仍为旧默认 `0`，会迁移为 `2`，避免页面初次显示仍是旧默认。
+- `/api/paper/status` 的 `capital_allocation` 返回新增 `leverage`，页面加载时回填杠杆输入框。
+- `/api/paper/capital-allocation` 保存接口新增密码校验，保存资金比例和杠杆时必须提交当前密码；该校验在后端执行，不能只靠前端弹窗。
+- 新增 `paper_security_settings` 表保存配置密码哈希；初始密码为 `123456`，且 `password_change_required=true`。
+- 第一次点击 `保存资金` 时，页面会提示输入当前密码，并强制设置新密码；新密码至少 6 位，不能继续使用 `123456`。后续保存只需输入修改后的密码。
+- 该修改只影响 Paper 资金配置、杠杆配置和配置保存权限；不改变策略信号、K 线处理、历史回测或已有持仓。
+- 验证：`python3 -m py_compile app/*.py` 通过；`python3 -m unittest discover -s tests -v`：61 个测试通过。
+
 ## 2026-07-07 Paper 页面持仓与日志显示调整
 
 - 按用户要求隐藏 `/paper` 页面里的 `最近平仓` 模块，不再渲染该区块，也不再调用 `fillTrades()` 更新隐藏表格；后端 `/api/paper/status` 的 `trades` 数据仍保留，避免影响其他调用。

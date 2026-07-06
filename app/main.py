@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import subprocess
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -47,6 +47,9 @@ class BacktestRequest(BaseModel):
 class CapitalAllocationRequest(BaseModel):
     symbols: dict[str, float]
     intervals: dict[str, float]
+    leverage: float = 2.0
+    password: str
+    new_password: Optional[str] = None
 
 
 @app.on_event("startup")
@@ -87,7 +90,13 @@ def update_paper_capital_allocation(request: CapitalAllocationRequest) -> dict[s
         engine = PaperEngine(conn)
         engine.initialize()
         try:
-            engine.update_capital_allocation(request.symbols, request.intervals)
+            engine.save_capital_settings_with_password(
+                request.symbols,
+                request.intervals,
+                request.leverage,
+                request.password,
+                request.new_password,
+            )
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         return engine.status()["capital_allocation"]
@@ -999,6 +1008,7 @@ PAPER_HTML = """
           <label>4h<input id="allocInterval4h" type="number" min="0" max="100" step="1"></label>
           <label>1d<input id="allocInterval1d" type="number" min="0" max="100" step="1"></label>
           <label>1w<input id="allocInterval1w" type="number" min="0" max="100" step="1"></label>
+          <label>杠杆<input id="paperLeverage" type="number" min="0" max="125" step="0.1" value="2"></label>
           <button onclick="saveCapitalAllocation()">保存资金</button>
         </div>
       </div>
@@ -1034,6 +1044,7 @@ PAPER_HTML = """
 <script>
 let marketTickerSocket = null;
 let marketTickerReconnectTimer = null;
+let paperPasswordChangeRequired = true;
 const marketTickerState = {};
 const THEME_STORAGE_KEY = 'weekly-paper-theme';
 
@@ -1062,6 +1073,7 @@ async function loadStatus() {
   document.getElementById('initial').textContent = Number(account.initial_equity || 1000).toFixed(2);
   document.getElementById('compound').textContent = account.compound ? 'YES' : 'NO';
   document.getElementById('runtimeDuration').innerHTML = formatRuntimeDuration(account.started_at);
+  paperPasswordChangeRequired = Boolean((data.security || {}).password_change_required);
   fillCapitalAllocation(data.capital_allocation || {});
   updateStrategyIntervals(data.strategies || []);
   fillTriggerConditions(data.trigger_conditions || []);
@@ -1076,10 +1088,12 @@ function loadAll() {
 }
 async function saveCapitalAllocation() {
   const payload = readCapitalAllocation();
+  const securedPayload = readSavePasswordPayload(payload);
+  if (!securedPayload) return;
   const res = await fetch('/api/paper/capital-allocation', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(payload),
+    body: JSON.stringify(securedPayload),
   });
   const data = await res.json();
   if (!res.ok) {
@@ -1243,10 +1257,15 @@ function fillCapitalAllocation(allocation) {
   setInputValue('allocInterval4h', intervals['4h']);
   setInputValue('allocInterval1d', intervals['1d']);
   setInputValue('allocInterval1w', intervals['1w']);
+  setLeverageInputValue('paperLeverage', Number.isFinite(Number(allocation.leverage)) ? allocation.leverage : 2);
 }
 function setInputValue(id, value) {
   const el = document.getElementById(id);
   if (el && Number.isFinite(Number(value))) el.value = Number(value).toFixed(0);
+}
+function setLeverageInputValue(id, value) {
+  const el = document.getElementById(id);
+  if (el && Number.isFinite(Number(value))) el.value = String(Number(value));
 }
 function readCapitalAllocation() {
   return {
@@ -1261,7 +1280,25 @@ function readCapitalAllocation() {
       '1d': Number(document.getElementById('allocInterval1d').value || 0),
       '1w': Number(document.getElementById('allocInterval1w').value || 0),
     },
+    leverage: Number(document.getElementById('paperLeverage').value || 0),
   };
+}
+function readSavePasswordPayload(payload) {
+  const password = prompt(paperPasswordChangeRequired ? '请输入当前密码。初始密码是 123456，本次保存必须修改密码。' : '请输入保存密码');
+  if (password === null) return null;
+  const securedPayload = { ...payload, password };
+  if (paperPasswordChangeRequired) {
+    const newPassword = prompt('请设置新密码，至少 6 位，不能继续使用 123456');
+    if (newPassword === null) return null;
+    const confirmPassword = prompt('请再次输入新密码');
+    if (confirmPassword === null) return null;
+    if (newPassword !== confirmPassword) {
+      alert('两次输入的新密码不一致');
+      return null;
+    }
+    securedPayload.new_password = newPassword;
+  }
+  return securedPayload;
 }
 function fillStrategies(items) {
   document.getElementById('strategies').innerHTML = items.map(s => `

@@ -6,6 +6,7 @@ import app.main as main
 from app.main import HTML, PAPER_HTML
 from app.paper import (
     PAPER_DEFAULT_INITIAL_EQUITY,
+    PAPER_DEFAULT_LEVERAGE,
     PaperEngine,
     _unsatisfied_trigger_checks,
     init_paper_schema,
@@ -20,6 +21,7 @@ class PaperTradingTests(unittest.TestCase):
         strategies = paper_strategy_defaults()
 
         self.assertEqual(PAPER_DEFAULT_INITIAL_EQUITY, 1000.0)
+        self.assertEqual(PAPER_DEFAULT_LEVERAGE, 2.0)
         self.assertEqual(
             [(s.symbol, s.interval) for s in strategies],
             [
@@ -91,6 +93,7 @@ class PaperTradingTests(unittest.TestCase):
 
         self.assertEqual(account["initial_equity"], 1000.0)
         self.assertEqual(account["equity"], 1000.0)
+        self.assertEqual(account["leverage"], 2.0)
         self.assertEqual(len(strategies), 10)
 
     def test_paper_engine_syncs_existing_strategy_params_to_code_defaults(self) -> None:
@@ -160,6 +163,8 @@ class PaperTradingTests(unittest.TestCase):
         allocation = status["capital_allocation"]
         self.assertEqual(allocation["symbols"], {"BTCUSDT": 80.0, "ETHUSDT": 20.0})
         self.assertEqual(allocation["intervals"], {"15m": 0.0, "1h": 30.0, "4h": 40.0, "1d": 20.0, "1w": 10.0})
+        self.assertEqual(allocation["leverage"], 2.0)
+        self.assertTrue(status["security"]["password_change_required"])
         slots = {(row["symbol"], row["interval"]): row for row in allocation["slots"]}
         self.assertEqual(slots[("BTCUSDT", "4h")]["allocated_margin"], 320.0)
         self.assertEqual(slots[("ETHUSDT", "4h")]["allocated_margin"], 80.0)
@@ -180,7 +185,41 @@ class PaperTradingTests(unittest.TestCase):
 
         self.assertIsNotNone(position)
         self.assertAlmostEqual(position.entry_margin, 80.0)
-        self.assertAlmostEqual(position.quantity, 80.0 / (100.0 * (1 + 0.0005)))
+        self.assertAlmostEqual(position.quantity, 80.0 * 2.0 / (100.0 * (1 + 0.0005)))
+
+    def test_paper_capital_settings_require_initial_password_change(self) -> None:
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        init_paper_schema(conn)
+        engine = PaperEngine(conn)
+        engine.initialize()
+
+        with self.assertRaisesRegex(ValueError, "首次保存必须修改初始密码"):
+            engine.save_capital_settings_with_password(
+                {"BTCUSDT": 70.0, "ETHUSDT": 30.0},
+                {"15m": 20.0, "1h": 30.0, "4h": 30.0, "1d": 20.0, "1w": 0.0},
+                3.0,
+                "123456",
+            )
+
+        engine.save_capital_settings_with_password(
+            {"BTCUSDT": 70.0, "ETHUSDT": 30.0},
+            {"15m": 20.0, "1h": 30.0, "4h": 30.0, "1d": 20.0, "1w": 0.0},
+            3.0,
+            "123456",
+            "abcdef",
+        )
+        status = engine.status()
+        self.assertFalse(status["security"]["password_change_required"])
+        self.assertEqual(status["capital_allocation"]["leverage"], 3.0)
+
+        with self.assertRaisesRegex(ValueError, "密码错误"):
+            engine.save_capital_settings_with_password(
+                {"BTCUSDT": 80.0, "ETHUSDT": 20.0},
+                {"15m": 20.0, "1h": 30.0, "4h": 30.0, "1d": 20.0, "1w": 0.0},
+                2.0,
+                "123456",
+            )
 
     def test_paper_allocation_update_keeps_existing_margin_until_position_closes(self) -> None:
         conn = sqlite3.connect(":memory:")
@@ -437,8 +476,14 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn('id="allocSymbolETHUSDT"', PAPER_HTML)
         self.assertIn('id="allocInterval15m"', PAPER_HTML)
         self.assertIn('id="allocInterval4h"', PAPER_HTML)
+        self.assertIn('id="paperLeverage" type="number" min="0" max="125" step="0.1" value="2"', PAPER_HTML)
         self.assertIn("saveCapitalAllocation()", PAPER_HTML)
         self.assertIn("fetch('/api/paper/capital-allocation'", PAPER_HTML)
+        self.assertIn("paperPasswordChangeRequired", PAPER_HTML)
+        self.assertIn("function readSavePasswordPayload(payload)", PAPER_HTML)
+        self.assertIn("prompt(paperPasswordChangeRequired ?", PAPER_HTML)
+        self.assertIn("securedPayload.new_password = newPassword;", PAPER_HTML)
+        self.assertIn("leverage: Number(document.getElementById('paperLeverage').value || 0)", PAPER_HTML)
         self.assertIn("function parameterExplanation(p)", PAPER_HTML)
         self.assertIn('title="${parameterExplanation(s.params)}"', PAPER_HTML)
 
