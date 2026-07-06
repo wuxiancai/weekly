@@ -1007,7 +1007,7 @@ PAPER_HTML = """
     </section>
     <section class="panel">
       <h2>当前持仓</h2>
-      <table><thead><tr><th>交易对</th><th>周期</th><th>方向</th><th>入场时间</th><th>入场价</th><th>强平价格</th><th>数量</th><th>保证金</th><th>止损</th><th>保护/止盈</th><th>预计盈利</th><th>最新止盈</th></tr></thead><tbody id="positions"></tbody></table>
+      <table><thead><tr><th>交易对</th><th>周期</th><th>方向</th><th>入场时间</th><th>入场价</th><th>强平价格</th><th>数量</th><th>保证金</th><th>止损</th><th>保护/止盈</th><th>预计盈利</th><th>预计收益率</th><th>最新止盈</th></tr></thead><tbody id="positions"></tbody></table>
     </section>
     <section class="panel">
       <h2>策略触发条件</h2>
@@ -1322,10 +1322,21 @@ function projectedTakeProfitCell(p) {
   if (!Number.isFinite(pnl)) return '<td class="muted">-</td>';
   return `<td class="${pnl >= 0 ? 'pos' : 'neg'}">${formatAmount(pnl)}</td>`;
 }
+function projectedTakeProfitRate(p) {
+  const pnl = projectedTakeProfit(p);
+  const margin = Number(p.entry_margin);
+  if (!Number.isFinite(pnl) || !Number.isFinite(margin) || margin <= 0) return null;
+  return pnl / margin * 100;
+}
+function projectedTakeProfitRateCell(p) {
+  const rate = projectedTakeProfitRate(p);
+  if (!Number.isFinite(rate)) return '<td class="muted">-</td>';
+  return `<td class="${rate >= 0 ? 'pos' : 'neg'}">${rate.toFixed(2)}%</td>`;
+}
 function fillPositions(items) {
   document.getElementById('positions').innerHTML = items.map(p => `
-    <tr><td>${symbolCell(p.symbol)}</td><td>${intervalCell(p.interval)}</td><td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${date(p.entry_time)}</td><td>${formatPrice(p.entry_price)}</td><td>${formatPrice(p.liquidation_price)}</td><td>${Number(p.quantity).toFixed(6)}</td><td>${formatAmount(p.entry_margin)}</td><td class="neg">${formatPrice(p.stop_price)}</td><td class="pos">${formatPrice(p.initial_take_price)}</td>${projectedTakeProfitCell(p)}<td class="pos">${formatPrice(p.latest_take_price)}</td></tr>
-  `).join('') || '<tr><td colspan="12" class="muted">暂无持仓</td></tr>';
+    <tr><td>${symbolCell(p.symbol)}</td><td>${intervalCell(p.interval)}</td><td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${date(p.entry_time)}</td><td>${formatPrice(p.entry_price)}</td><td>${formatPrice(p.liquidation_price)}</td><td>${Number(p.quantity).toFixed(6)}</td><td>${formatAmount(p.entry_margin)}</td><td class="neg">${formatPrice(p.stop_price)}</td><td class="pos">${formatPrice(p.initial_take_price)}</td>${projectedTakeProfitCell(p)}${projectedTakeProfitRateCell(p)}<td class="pos">${formatPrice(p.latest_take_price)}</td></tr>
+  `).join('') || '<tr><td colspan="13" class="muted">暂无持仓</td></tr>';
 }
 function tradeRow(t) {
   return `<tr><td>${symbolCell(t.symbol)}</td><td>${intervalCell(t.interval)}</td><td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td><td>${date(t.entry_time)}</td><td>${date(t.exit_time)}</td><td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td><td class="${t.pnl_pct >= 0 ? 'pos' : 'neg'}">${Number(t.pnl_pct).toFixed(2)}%</td><td>${t.exit_reason}</td></tr>`;
