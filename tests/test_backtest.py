@@ -57,6 +57,20 @@ class BacktestTests(unittest.TestCase):
         self.assertIn("最大回撤", HTML)
         self.assertIn("收益回撤比", HTML)
 
+    def test_page_shows_previous_backtest_result_between_metrics_and_chart(self) -> None:
+        self.assertLess(HTML.index('class="grid"'), HTML.index('id="previousBacktestPanel"'))
+        self.assertLess(HTML.index('id="previousBacktestPanel"'), HTML.index('class="panel chart-wrap"'))
+        self.assertIn("上一次回测结果", HTML)
+        self.assertIn('id="prevFinalEquity"', HTML)
+        self.assertIn('id="prevReturnPct"', HTML)
+        self.assertIn('id="previousBacktestMeta"', HTML)
+        self.assertIn("let previousResult = null;", HTML)
+        self.assertIn("previousResult = lastResult;", HTML)
+        self.assertIn("fillPreviousBacktest(previousResult);", HTML)
+        self.assertIn("function fillPreviousBacktest(result)", HTML)
+        self.assertIn("上一次回测结果", ETH_HTML)
+        self.assertIn('id="previousBacktestPanel"', ETH_HTML)
+
     def test_home_links_to_eth_daily_backtest_page(self) -> None:
         self.assertIn('href="/eth">ETH 回测</a>', HTML)
         self.assertIn("ETHUSDT U本位永续合约日线回测系统", ETH_HTML)

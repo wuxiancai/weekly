@@ -357,6 +357,15 @@ HTML = """
     .neg { color:var(--red); }
     .muted { color:var(--muted); }
     .status { color:var(--muted); font-size:13px; }
+    .previous-backtest { display:grid; gap:10px; }
+    .previous-head { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; }
+    .previous-head h2 { margin:0; font-size:18px; }
+    .previous-grid { display:grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap:0; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+    .previous-cell { padding:11px 12px; border-right:1px solid var(--line); background:#141922; }
+    .previous-cell:last-child { border-right:0; }
+    .previous-cell span { display:block; color:var(--muted); font-size:12px; margin-bottom:5px; }
+    .previous-cell strong { font-size:18px; }
+    .previous-meta { color:var(--muted); font-size:12px; line-height:1.55; }
     .formula { color:var(--muted); font-size:12px; line-height:1.6; margin:4px 0 12px; }
     .formula a { color:var(--blue); text-decoration:none; }
     @media (max-width: 980px) { .toolbar { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -369,10 +378,11 @@ HTML = """
       main { padding:10px; gap:10px; }
       .toolbar { grid-template-columns:1fr; gap:8px; padding:10px; }
       input, select, button { min-height:42px; font-size:16px; }
-      .grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
-      .metric { padding:11px 10px; border-right:0; border-bottom:1px solid var(--line); }
-      .metric:nth-child(odd) { border-right:1px solid var(--line); }
-      .metric strong { font-size:17px; }
+      .grid, .previous-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+      .metric, .previous-cell { padding:11px 10px; border-right:0; border-bottom:1px solid var(--line); }
+      .metric:nth-child(odd), .previous-cell:nth-child(odd) { border-right:1px solid var(--line); }
+      .metric strong, .previous-cell strong { font-size:17px; }
+      .previous-head { align-items:flex-start; flex-direction:column; }
       .panel { padding:10px; border-radius:7px; }
       .chart-wrap { height:360px; }
       table { min-width:820px; font-size:11px; }
@@ -437,6 +447,22 @@ HTML = """
       <div class="metric"><span>交易次数</span><strong id="tradeCount">-</strong></div>
       <div class="metric"><span>收益回撤比</span><strong id="rdd">-</strong></div>
     </section>
+    <section class="panel previous-backtest" id="previousBacktestPanel">
+      <div class="previous-head">
+        <h2>上一次回测结果</h2>
+        <div class="status" id="previousBacktestHint">运行第二次回测后，这里显示本次之前的回测结果，用于对比。</div>
+      </div>
+      <div class="previous-grid">
+        <div class="previous-cell"><span>最终资金(USDT)</span><strong id="prevFinalEquity">-</strong></div>
+        <div class="previous-cell"><span>总收益率</span><strong id="prevReturnPct">-</strong></div>
+        <div class="previous-cell"><span>最大单笔回撤</span><strong id="prevDrawdown">-</strong></div>
+        <div class="previous-cell"><span>单笔最大亏损率</span><strong id="prevMaxSingleLoss">-</strong></div>
+        <div class="previous-cell"><span>胜率</span><strong id="prevWinRate">-</strong></div>
+        <div class="previous-cell"><span>交易次数</span><strong id="prevTradeCount">-</strong></div>
+        <div class="previous-cell"><span>收益回撤比</span><strong id="prevRdd">-</strong></div>
+      </div>
+      <div class="previous-meta" id="previousBacktestMeta">暂无上一次回测结果。</div>
+    </section>
     <section class="panel chart-wrap"><canvas id="chart"></canvas></section>
     <section class="panel">
       <h2>逐笔交易</h2>
@@ -460,6 +486,7 @@ HTML = """
 <script>
 let candles = [];
 let lastResult = null;
+let previousResult = null;
 const PAGE_SYMBOL = 'BTCUSDT';
 const PAGE_INTERVAL = '1w';
 const STRATEGY_DEFAULTS = {
@@ -646,12 +673,16 @@ async function loadCandles() {
 
 async function runBacktest() {
   setStatus('正在运行回测...');
-  const res = await fetch('/api/backtest', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload())});
+  const requestPayload = payload();
+  const res = await fetch('/api/backtest', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(requestPayload)});
   const data = await res.json();
   if (!res.ok) throwError(data);
+  data.request = requestPayload;
+  previousResult = lastResult;
   lastResult = data;
   candles = data.candles || candles;
   fillMetrics(data.metrics);
+  fillPreviousBacktest(previousResult);
   fillTrades(data.trades);
   drawChart(candles, data.trades);
   setStatus(`回测完成，run_id=${data.run_id}`);
@@ -684,6 +715,38 @@ function fillMetrics(m) {
   document.getElementById('winRate').textContent = `${Number(m.win_rate_pct).toFixed(2)}%`;
   document.getElementById('tradeCount').textContent = m.trade_count;
   document.getElementById('rdd').textContent = Number(m.return_drawdown_ratio).toFixed(2);
+}
+
+function fillPreviousBacktest(result) {
+  const ids = ['prevFinalEquity', 'prevReturnPct', 'prevDrawdown', 'prevMaxSingleLoss', 'prevWinRate', 'prevTradeCount', 'prevRdd'];
+  if (!result || !result.metrics) {
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      el.textContent = '-';
+      el.className = '';
+    });
+    document.getElementById('previousBacktestHint').textContent = '运行第二次回测后，这里显示本次之前的回测结果，用于对比。';
+    document.getElementById('previousBacktestMeta').textContent = '暂无上一次回测结果。';
+    return;
+  }
+  const m = result.metrics;
+  setMetricText('prevFinalEquity', Number(m.final_equity).toFixed(2));
+  setMetricText('prevReturnPct', `${Number(m.total_return_pct).toFixed(2)}%`, m.total_return_pct >= 0 ? 'pos' : 'neg');
+  setMetricText('prevDrawdown', `${Number(m.max_drawdown_pct).toFixed(2)}%`);
+  setMetricText('prevMaxSingleLoss', `${Number(m.max_single_loss_pct || 0).toFixed(2)}%`);
+  setMetricText('prevWinRate', `${Number(m.win_rate_pct).toFixed(2)}%`);
+  setMetricText('prevTradeCount', m.trade_count);
+  setMetricText('prevRdd', Number(m.return_drawdown_ratio).toFixed(2));
+  const params = result.params || {};
+  const request = result.request || payload();
+  document.getElementById('previousBacktestHint').textContent = '当前结果已更新；下方为更新前的上一轮回测。';
+  document.getElementById('previousBacktestMeta').textContent = `${request.symbol} ${request.interval}，参数：${paramSummary(params)}`;
+}
+
+function setMetricText(id, text, className = '') {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = className;
 }
 
 function fillTrades(items) {

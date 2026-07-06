@@ -1,5 +1,14 @@
 # Handoff
 
+## 2026-07-06 回测页增加上一次回测结果对比
+
+- 在 BTC 首页和 ETH 回测页的指标卡片下方、K 线图上方新增“上一次回测结果”区块。
+- 第一次运行回测时区块显示占位说明；第二次及以后运行回测时，会把本次覆盖前的上一轮 `lastResult` 保存为 `previousResult` 并展示。
+- 展示字段与顶部当前回测指标一致：最终资金、总收益率、最大单笔回撤、单笔最大亏损率、胜率、交易次数、收益回撤比。
+- 上一次结果保留上一轮请求的 `symbol / interval` 和参数摘要，避免用户切换周期或参数后看不出对比对象。
+- 该修改只影响前端展示，不改变回测 API、交易逻辑、参数默认值、数据库或 Paper Trading。
+- 验证：`python3 -m py_compile app/*.py` 通过；`python3 -m unittest discover -s tests -v`：60 个测试通过。
+
 ## 2026-07-06 15m 独立周期策略与微调
 
 - 新增 `BTCUSDT / 15m` 与 `ETHUSDT / 15m` 独立周期默认参数；页面周期下拉、`STRATEGY_DEFAULTS`、Paper Trading 策略池、Paper runner 周期、触发条件展示和资金配置 UI 已同步识别 `15m`。
