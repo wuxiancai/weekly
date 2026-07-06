@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVICE_NAME="${SERVICE_NAME:-btc-auto-trader}"
 USER_NAME="${SERVICE_USER:-$(whoami)}"
-PORT="${PORT:-8001}"
+PORT="${PORT:-8788}"
 
 if ! command -v systemctl >/dev/null 2>&1; then
   echo "systemd 不可用，当前系统不支持安装 service" >&2

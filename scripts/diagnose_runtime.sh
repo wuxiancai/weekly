@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST="${HOST:-127.0.0.1}"
-PORTS="${PORTS:-8001 8002}"
+PORTS="${PORTS:-8788 8789}"
 
 echo "Project: ${ROOT_DIR}"
 echo "Expected commit: $(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"

@@ -1,5 +1,13 @@
 # Handoff
 
+## 2026-07-06 Web 默认端口改为 8788
+
+- 按用户要求，程序默认端口已统一改为 `8788`。
+- 已同步修改：`start.sh`、`scripts/deploy_one_click.sh`、`scripts/install_systemd_service.sh`、`scripts/diagnose_runtime.sh`、`README.md`、`tests/test_deploy.py`、`docs/PROJECT_CONTEXT.md`、`docs/DECISIONS.md`、`docs/HANDOFF.md`。
+- `start.sh` 默认读取 `PORT=${PORT:-8788}`；如果 `8788` 被本项目旧进程占用，会先停止旧进程并复用；如果被其他应用占用，则顺延到 `8789` 等后续端口。
+- 诊断脚本默认检查 `8788 8789`。
+- 旧文档中的默认端口示例已统一调整为当前 `8788` 口径，避免后续部署和排障误解。
+
 ## 2026-07-06 更新 15m 默认策略为优化参数
 
 - 按用户确认结果，已更新默认 `15m` 交易策略和 Web 回测默认参数；只修改 `15m`，未修改 `1w/1d/4h/1h`。
@@ -134,7 +142,7 @@
 
 - `python3 -m py_compile app/*.py` 通过。
 - `python3 -m unittest discover -s tests -v`：4 个测试通过。
-- `./start.sh` 在 macOS 上识别系统并启动到 `0.0.0.0:8000`。
+- `./start.sh` 在 macOS 上识别系统并启动到 `0.0.0.0:8788`。
 - 防未来函数后，默认回测第一笔交易信号日为 `2023-03-27`，实际入场日为下一根周 K `2023-04-03`。
 - Walk-forward API：训练段 `2021-11-15` 至 `2025-02-03`，测试段 `2025-02-10` 至 `2026-06-29`。
 - 页面点击“样本外验证”成功渲染 10 条结果，无水平溢出。
@@ -246,7 +254,7 @@
   - `python3 -m unittest discover -s tests -v`：13 个测试通过。
   - 默认回测：本金 `10000`，杠杆 `0`，最终资金 `713275.6931`，收益率 `7032.7569%`。
   - 杠杆 `2` 回测：最终资金 `8722639.1458`，收益率 `87126.3915%`；第一笔收益从 `24027.3293` 放大到 `48054.6587`。
-  - `curl http://127.0.0.1:8000/` 已确认页面返回新字段：本金、杠杆、止盈阶梯、量能倍数等。
+  - `curl http://127.0.0.1:8788/` 已确认页面返回新字段：本金、杠杆、止盈阶梯、量能倍数等。
 
 ## 2026-07-03 BTCUSDT U本位永续页面口径更新
 
@@ -384,9 +392,9 @@
 - 部署更新：
   - 新增 `scripts/run_paper.sh`，使用项目 `.venv` 运行 `app.paper_runner`。
   - 新增 `scripts/deploy_one_click.sh`，自适应 Ubuntu 安装依赖，创建虚拟环境，安装 Python requirements，并写入两个 systemd 服务：
-    - `weekly-web`：运行 Web，监听 `0.0.0.0:${PORT:-8000}`。
+    - `weekly-web`：运行 Web，监听 `0.0.0.0:${PORT:-8788}`。
     - `weekly-paper`：运行模拟交易 runner。
-  - 一键部署后访问 `http://服务器IP:8000/paper` 查看实盘模拟状态。
+  - 一键部署后访问 `http://服务器IP:8788/paper` 查看实盘模拟状态。
 - 本轮验证：
   - `python3 -m py_compile app/*.py` 通过。
   - `python3 -m unittest discover -s tests -v`：29 个测试通过。
@@ -522,7 +530,7 @@
 ## 2026-07-04 1h 参数优化与默认值同步
 
 - 用户要求先提交端口修改，再执行 1h 策略优化，找出收益率最高、胜率最高组合；一旦发现最优参数就写为默认。
-- 端口提交已完成：`7c0886f Set deploy default port to 8001`。
+- 端口提交已完成：`7c0886f Set deploy default port to 8788`。
 - 已同步本地 Binance Futures 1h 数据：
   - `BTCUSDT 1h`：`59648` 根，实际数据 `2019-09-08` 至 `2026-06-29`。
   - `ETHUSDT 1h`：`57738` 根，实际数据 `2019-11-27` 至 `2026-06-29`。
@@ -646,15 +654,15 @@
 默认访问：
 
 ```text
-http://127.0.0.1:8001
+http://127.0.0.1:8788
 ```
 
 ## 2026-07-04 Web 默认端口与占用处理
 
-- Web 默认端口已从 `8000` 改为 `8001`，`start.sh`、`scripts/deploy_one_click.sh`、`scripts/install_systemd_service.sh` 保持一致。
+- Web 默认端口已统一改为 `8788`，`start.sh`、`scripts/deploy_one_click.sh`、`scripts/install_systemd_service.sh` 保持一致。
 - `start.sh` 端口处理规则：
   - 如果候选端口被本项目进程占用，直接终止旧进程并复用该端口重新启动。
-  - 如果候选端口被其他应用占用，自动顺延到下一个端口，例如 `8002`、`8003`。
+  - 如果候选端口被其他应用占用，自动顺延到下一个端口，例如 `8789`、`8790`。
   - 默认最多从起始端口向后检查 50 个端口。
 
 ## 2026-07-04 Paper 增加 1w 并动态展示策略周期
@@ -708,16 +716,16 @@ kill $(cat runtime/start.pid)
 ## 2026-07-04 start.sh 处理旧 systemd 双轨部署
 
 - 用户贴出的服务器日志显示：
-  - 手动执行 `bash scripts/start.sh` 启动的是旧前台 Web 进程，监听 `8002`，输出 `停止: Ctrl+C`。
-  - `Ctrl+C` 后 `8002` 不再监听。
-  - 但 `systemctl status weekly-web` 仍 active，因为旧 `weekly-web` 服务直接运行 `uvicorn app.main:app` 并监听 `8001`。
+  - 手动执行 `bash scripts/start.sh` 启动的是旧前台 Web 进程，监听 `8789`，输出 `停止: Ctrl+C`。
+  - `Ctrl+C` 后 `8789` 不再监听。
+  - 但 `systemctl status weekly-web` 仍 active，因为旧 `weekly-web` 服务直接运行 `uvicorn app.main:app` 并监听 `8788`。
   - `weekly-paper` 旧独立服务仍 active。
 - 根因：服务器还处在旧部署形态，存在三条启动路径：
   - 手动前台 `scripts/start.sh` 临时进程。
   - 旧 `weekly-web` 直接 `uvicorn`。
   - 旧 `weekly-paper` 直接 `app.paper_runner`。
 - 修改：
-  - 根目录 `start.sh` 默认模式在 systemd 环境下不再起临时 `8002` 进程，而是写入/更新 `weekly-web.service`，`ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground`，然后 `systemctl restart weekly-web`。
+  - 根目录 `start.sh` 默认模式在 systemd 环境下不再起临时 `8789` 进程，而是写入/更新 `weekly-web.service`，`ExecStart=/usr/bin/env bash ${ROOT_DIR}/start.sh --foreground`，然后 `systemctl restart weekly-web`。
   - 根目录 `start.sh` 会停止、禁用并删除旧 `weekly-paper.service`。
   - 根目录 `start.sh` 会先 `systemctl stop weekly-web`，再清理本项目遗留 Python 进程，避免旧 service 自动重启抢占端口。
   - `--foreground` 模式里的 Web 输出已写入 `runtime/logs/web.log`，不再直接把 uvicorn 的 `Press CTRL+C to quit` 打到手动终端。
@@ -732,7 +740,7 @@ kill $(cat runtime/start.pid)
 - 诊断当前 Web 进程实际运行版本：
 
 ```bash
-curl -s http://127.0.0.1:8001/api/system/runtime
+curl -s http://127.0.0.1:8788/api/system/runtime
 ```
 
 - 如果返回里 `paper_html_markers.hardcoded_old_intervals=true`，或页面标题仍是旧 `BTCUSDT / ETHUSDT U本位永续合约模拟交易`，说明当前浏览器访问的 Web 进程不是最新代码。
@@ -750,16 +758,16 @@ curl -s http://127.0.0.1:8001/api/system/runtime
 - `start.sh` 会把当前 `git rev-parse --short HEAD` 写入 `APP_VERSION`，systemd unit 也会带上该环境变量。
 - 用途：以后出现“端口有监听但页面还是旧”的情况，先查 `/api/system/runtime`，确认服务实际运行 commit 和页面标记。
 
-## 2026-07-04 8002 残留旧进程与 Paper 页面旧版本诊断
+## 2026-07-04 8789 残留旧进程与 Paper 页面旧版本诊断
 
-- 用户重新部署后反馈 `8001` 和 `8002` 都能访问，且 `/paper` 页面仍显示旧标题 `BTCUSDT / ETHUSDT U本位永续合约模拟交易` 和策略周期 `1d / 4h`。
+- 用户重新部署后反馈 `8788` 和 `8789` 都能访问，且 `/paper` 页面仍显示旧标题 `BTCUSDT / ETHUSDT U本位永续合约模拟交易` 和策略周期 `1d / 4h`。
 - 本地当前代码结论：
   - `PAPER_HTML` 不再硬编码 `1d / 4h`，而是通过 `id="strategyIntervals"` 从 `/api/paper/status` 返回的启用策略动态计算。
   - `paper_strategy_defaults()` 当前应初始化 8 个策略：`BTCUSDT/ETHUSDT` 各 `1w / 1d / 4h / 1h`。
   - 因此截图中的旧标题和 `1d / 4h` 不是当前代码渲染结果，而是远端仍有旧 Web 进程或旧代码实例在提供页面。
 - 本次修正：
-  - `start.sh` 的旧进程清理范围从本项目 `.venv` 下的 `uvicorn` / `app.paper_runner` 扩展到本项目根目录 `start.sh` 和旧 `scripts/start.sh` supervisor，避免旧 `8002` shell supervisor 残留。
-  - 新增 `scripts/diagnose_runtime.sh`，用于在服务器上同时检查 `8001/8002` 的监听进程、`/api/system/runtime` 返回 commit、以及 `/paper` HTML 是否仍是旧硬编码标题/周期。
+  - `start.sh` 的旧进程清理范围从本项目 `.venv` 下的 `uvicorn` / `app.paper_runner` 扩展到本项目根目录 `start.sh` 和旧 `scripts/start.sh` supervisor，避免旧 `8789` shell supervisor 残留。
+  - 新增 `scripts/diagnose_runtime.sh`，用于在服务器上同时检查 `8788/8789` 的监听进程、`/api/system/runtime` 返回 commit、以及 `/paper` HTML 是否仍是旧硬编码标题/周期。
 - 服务器更新到此版本后建议执行：
 
 ```bash
@@ -770,7 +778,7 @@ chmod +x start.sh scripts/diagnose_runtime.sh
 ```
 
 - 预期结果：
-  - 只有 `8001` 是本项目服务；如果 `8002` 仍监听，诊断脚本会显示它的 PID 和运行版本。
+  - 只有 `8788` 是本项目服务；如果 `8789` 仍监听，诊断脚本会显示它的 PID 和运行版本。
   - `/api/system/runtime.paper_html_markers.hardcoded_old_intervals=false`。
   - `/api/system/runtime.paper_html_markers.dynamic_strategy_intervals=true`。
   - `/api/paper/status` 的 `strategies` 应包含 8 条策略。
@@ -824,7 +832,7 @@ chmod +x start.sh scripts/diagnose_runtime.sh
 - 修复：`start.sh` 在后台模式中先判断 `PASSTHROUGH_ARGS` 长度；无额外参数时不展开空数组；并统一用绝对路径 `"$ROOT_DIR/start.sh"` 交给 `nohup`。
 - 真实验证：
   - `START_USE_SYSTEMD=0 bash start.sh --daemon` 成功启动后台 supervisor。
-  - `curl http://127.0.0.1:8001/api/system/runtime` 返回 `dynamic_strategy_intervals=true`、`new_title=true`、`hardcoded_old_intervals=false`。
+  - `curl http://127.0.0.1:8788/api/system/runtime` 返回 `dynamic_strategy_intervals=true`、`new_title=true`、`hardcoded_old_intervals=false`。
   - 验证后已停止测试启动的后台进程。
 - 回归验证：
   - `bash -n start.sh scripts/deploy_one_click.sh` 通过。
@@ -903,7 +911,7 @@ chmod +x start.sh scripts/diagnose_runtime.sh
   - TDD 红灯确认：新增资金分配和 hover 测试在实现前失败。
   - `python3 -m py_compile app/*.py` 通过。
   - `python3 -m unittest discover -s tests -v`：48 个测试通过。
-  - Playwright 打开 `http://127.0.0.1:8765/paper`，快照确认顶部显示 BTC/ETH/1h/4h/1d/1w 输入框，默认值为 `80/20/30/40/20/10`；唯一 console error 是 `favicon.ico` 404。
+  - Playwright 打开 `http://127.0.0.1:8788/paper`，快照确认顶部显示 BTC/ETH/1h/4h/1d/1w 输入框，默认值为 `80/20/30/40/20/10`；唯一 console error 是 `favicon.ico` 404。
 
 ## 2026-07-05 Paper 顶部资金配置布局优化
 
@@ -917,7 +925,7 @@ chmod +x start.sh scripts/diagnose_runtime.sh
   - 新增回归测试确保 Paper 顶部不再使用 `repeat(5,1fr)`，资金控件使用单行 flex。
   - `python3 -m py_compile app/*.py` 通过。
   - `python3 -m unittest discover -s tests -v`：49 个测试通过。
-  - Playwright 打开 `http://127.0.0.1:8765/paper`，DOM 尺寸确认资金控件同一行；截图人工确认顶部布局更紧凑。
+  - Playwright 打开 `http://127.0.0.1:8788/paper`，DOM 尺寸确认资金控件同一行；截图人工确认顶部布局更紧凑。
 
 ## 下一步建议
 

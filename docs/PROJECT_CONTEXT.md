@@ -45,7 +45,7 @@
 - `./start.sh` 的启动顺序必须是：先停止旧 `weekly-web` / 旧 `weekly-paper` systemd 服务和本项目遗留 Python 进程；再检查目标端口是否被其他项目占用，被其他项目占用才顺延；最后通过 systemd 启动本项目 Web 回测和 Paper 模拟交易。
 - `./start.sh --foreground` 是 systemd 内部托管模式，Web 和 Paper 输出分别写入 `runtime/logs/web.log` 与 `runtime/logs/paper_runner.log`，避免手动终端出现 `Press CTRL+C to quit` 的前台 uvicorn 误导。
 - 项目只保留根目录 `./start.sh` 作为启动入口，不再保留 `scripts/start.sh` 包装脚本，避免用户误执行旧入口；运行态可通过 `/api/system/runtime` 查看当前 PID、cwd、git commit 和 Paper 页面标记。
-- Web 默认端口为 `8001`；如果端口被本项目进程占用，`start.sh` 会先终止旧进程并复用该端口；如果被其他应用占用，则自动顺延到下一个可用端口。
+- Web 默认端口为 `8788`；如果端口被本项目进程占用，`start.sh` 会先终止旧进程并复用该端口；如果被其他应用占用，则自动顺延到下一个可用端口。
 - Paper runner 会按策略指标周期自动计算预热 K 线数量，环境变量 `PAPER_WARMUP_CANDLES` 与策略需求取较大值，且不少于 60 根 K 线。
 
 ## 重要原则
