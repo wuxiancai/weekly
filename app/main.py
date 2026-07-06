@@ -522,10 +522,10 @@ const STRATEGY_DEFAULTS = {
       regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 22, rangeBbWidthMax: 0.05, rangeRsiLow: 35, rangeRsiHigh: 65
     },
     '15m': {
-      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
-      feeRate: 0.0005, slippageRate: 0.0005, ema: 15, ma: 50, rsiPeriod: 14, atrPeriod: 14,
+      start: '2026-01-01', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
+      feeRate: 0.0005, slippageRate: 0.0005, ema: 34, ma: 89, rsiPeriod: 14, atrPeriod: 14,
       adxPeriod: 14, adx: 45, longRsiMin: 55, longRsiMax: 85, shortRsiMin: 0, shortRsiMax: 100,
-      stopAtr: 0.8, takeAtr: 6.0, takeAtrStep: 1.0, takeAtrMax: 16.0, takeAtrBuffer: 0, volumeMult: 1.5,
+      stopAtr: 0.8, takeAtr: 10.0, takeAtrStep: 2.0, takeAtrMax: 24.0, takeAtrBuffer: 0, volumeMult: 1.75,
       regimeSwitch: true, trendMaGapMin: 0.003, rangeAdxMax: 18, rangeBbWidthMax: 0.04, rangeRsiLow: 25, rangeRsiHigh: 70
     }
   },
@@ -559,11 +559,11 @@ const STRATEGY_DEFAULTS = {
       regimeSwitch: true, trendMaGapMin: 0.0, rangeAdxMax: 22, rangeBbWidthMax: 0.12, rangeRsiLow: 30, rangeRsiHigh: 65
     },
     '15m': {
-      start: '2019-09-02', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
+      start: '2026-01-01', end: '2026-06-29', initialEquity: 10000, compound: true, leverage: 0,
       feeRate: 0.0005, slippageRate: 0.0005, ema: 21, ma: 60, rsiPeriod: 14, atrPeriod: 14,
-      adxPeriod: 14, adx: 35, longRsiMin: 50, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
-      stopAtr: 0.8, takeAtr: 6.0, takeAtrStep: 1.0, takeAtrMax: 16.0, takeAtrBuffer: 0, volumeMult: 1.25,
-      regimeSwitch: true, trendMaGapMin: 0.0015, rangeAdxMax: 18, rangeBbWidthMax: 0.04, rangeRsiLow: 25, rangeRsiHigh: 70
+      adxPeriod: 14, adx: 35, longRsiMin: 45, longRsiMax: 80, shortRsiMin: 0, shortRsiMax: 100,
+      stopAtr: 0.8, takeAtr: 10.0, takeAtrStep: 2.0, takeAtrMax: 24.0, takeAtrBuffer: 0, volumeMult: 1.25,
+      regimeSwitch: true, trendMaGapMin: 0.003, rangeAdxMax: 18, rangeBbWidthMax: 0.04, rangeRsiLow: 25, rangeRsiHigh: 70
     }
   }
 };
