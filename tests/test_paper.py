@@ -375,11 +375,14 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("setInterval(loadMarketTicker, 60000);", PAPER_HTML)
         self.assertNotIn("setInterval(loadMarketTicker, 10000);", PAPER_HTML)
 
-    def test_paper_page_shows_scrollable_trade_records_before_recent_closed_trades(self) -> None:
-        self.assertLess(PAPER_HTML.index("<h2>交易记录</h2>"), PAPER_HTML.index("<h2>最近平仓</h2>"))
+    def test_paper_page_shows_scrollable_trade_records_and_hides_recent_closed_trades(self) -> None:
+        self.assertIn("<h2>交易记录</h2>", PAPER_HTML)
+        self.assertNotIn("<h2>最近平仓</h2>", PAPER_HTML)
+        self.assertNotIn('id="trades"', PAPER_HTML)
         self.assertIn('class="trade-records-scroll"', PAPER_HTML)
         self.assertIn('id="tradeRecords"', PAPER_HTML)
         self.assertIn("fillTradeRecords(data.trade_records || data.trades || []);", PAPER_HTML)
+        self.assertNotIn("fillTrades(data.trades || []);", PAPER_HTML)
         self.assertIn("function fillTradeRecords(items)", PAPER_HTML)
 
     def test_paper_trade_rows_color_return_rate_by_profit_or_loss(self) -> None:
@@ -388,11 +391,14 @@ class PaperTradingTests(unittest.TestCase):
     def test_paper_page_shows_intervals_amounts_and_formatted_log_times(self) -> None:
         self.assertIn("<th>交易对</th><th>周期</th><th>方向</th>", PAPER_HTML)
         self.assertIn("<th>入场价</th><th>强平价格</th><th>数量</th><th>保证金</th>", PAPER_HTML)
-        self.assertIn("<th>止损</th><th>保护/止盈</th><th>最新止盈</th>", PAPER_HTML)
+        self.assertIn("<th>止损</th><th>保护/止盈</th><th>预计盈利</th><th>最新止盈</th>", PAPER_HTML)
         self.assertIn("formatAmount(p.entry_margin)", PAPER_HTML)
         self.assertIn("formatPrice(p.liquidation_price)", PAPER_HTML)
         self.assertIn('<td class="neg">${formatPrice(p.stop_price)}</td>', PAPER_HTML)
-        self.assertIn('<td class="pos">${formatPrice(p.initial_take_price)}</td>', PAPER_HTML)
+        self.assertIn('<td class="pos">${formatPrice(p.initial_take_price)}</td>${projectedTakeProfitCell(p)}<td class="pos">${formatPrice(p.latest_take_price)}</td>', PAPER_HTML)
+        self.assertIn("function projectedTakeProfit(p)", PAPER_HTML)
+        self.assertIn("return p.side === 'SHORT' ? (entry - target) * quantity : (target - entry) * quantity;", PAPER_HTML)
+        self.assertIn("function projectedTakeProfitCell(p)", PAPER_HTML)
         self.assertIn('<td class="pos">${formatPrice(p.latest_take_price)}</td>', PAPER_HTML)
         self.assertIn("symbolClass(value)", PAPER_HTML)
         self.assertIn("intervalClass(value)", PAPER_HTML)
@@ -402,6 +408,7 @@ class PaperTradingTests(unittest.TestCase):
         self.assertIn("const utc8 = new Date(value + 8 * 60 * 60 * 1000);", PAPER_HTML)
         self.assertIn("utc8.getUTCFullYear()", PAPER_HTML)
         self.assertIn("function formatPayload(payload)", PAPER_HTML)
+        self.assertIn('class="events-scroll"', PAPER_HTML)
         self.assertIn("entry_time", PAPER_HTML)
         self.assertIn("event_time", PAPER_HTML)
         self.assertIn("interval-1w", PAPER_HTML)

@@ -929,6 +929,7 @@ PAPER_HTML = """
     .trigger-satisfied strong { color:var(--green); }
     .trigger-unsatisfied strong, .trigger-no-data strong, .trigger-data-insufficient strong, .trigger-disabled strong { color:var(--muted); }
     .trade-records-scroll { max-height:214px; overflow:auto; -webkit-overflow-scrolling:touch; border-bottom:1px solid var(--line); }
+    .events-scroll { max-height:360px; overflow:auto; -webkit-overflow-scrolling:touch; border-bottom:1px solid var(--line); }
     table { width:100%; min-width:760px; border-collapse:collapse; font-size:12px; }
     th, td { border-bottom:1px solid var(--line); padding:8px; text-align:right; white-space:nowrap; }
     th:first-child, td:first-child { text-align:left; position:sticky; left:0; z-index:1; background:var(--panel); }
@@ -963,6 +964,7 @@ PAPER_HTML = """
       table { min-width:820px; font-size:11px; }
       th, td { padding:7px 8px; }
       .trade-records-scroll { max-height:260px; }
+      .events-scroll { max-height:360px; }
     }
   </style>
 </head>
@@ -1005,7 +1007,7 @@ PAPER_HTML = """
     </section>
     <section class="panel">
       <h2>当前持仓</h2>
-      <table><thead><tr><th>交易对</th><th>周期</th><th>方向</th><th>入场时间</th><th>入场价</th><th>强平价格</th><th>数量</th><th>保证金</th><th>止损</th><th>保护/止盈</th><th>最新止盈</th></tr></thead><tbody id="positions"></tbody></table>
+      <table><thead><tr><th>交易对</th><th>周期</th><th>方向</th><th>入场时间</th><th>入场价</th><th>强平价格</th><th>数量</th><th>保证金</th><th>止损</th><th>保护/止盈</th><th>预计盈利</th><th>最新止盈</th></tr></thead><tbody id="positions"></tbody></table>
     </section>
     <section class="panel">
       <h2>策略触发条件</h2>
@@ -1023,12 +1025,10 @@ PAPER_HTML = """
       </div>
     </section>
     <section class="panel">
-      <h2>最近平仓</h2>
-      <table><thead><tr><th>交易对</th><th>周期</th><th>方向</th><th>入场</th><th>出场</th><th>入场价</th><th>出场价</th><th>收益(USDT)</th><th>收益率</th><th>原因</th></tr></thead><tbody id="trades"></tbody></table>
-    </section>
-    <section class="panel">
       <h2>运行日志</h2>
-      <table><thead><tr><th>时间</th><th>交易对</th><th>类型</th><th>内容</th></tr></thead><tbody id="events"></tbody></table>
+      <div class="events-scroll">
+        <table><thead><tr><th>时间</th><th>交易对</th><th>类型</th><th>内容</th></tr></thead><tbody id="events"></tbody></table>
+      </div>
     </section>
   </main>
 <script>
@@ -1068,7 +1068,6 @@ async function loadStatus() {
   fillStrategies(data.strategies || []);
   fillPositions(data.positions || []);
   fillTradeRecords(data.trade_records || data.trades || []);
-  fillTrades(data.trades || []);
   fillEvents(data.events || []);
 }
 function loadAll() {
@@ -1311,19 +1310,28 @@ function triggerDetails(item) {
   if (checks.length > 0) return checks.join('；');
   return item.message || triggerLabel(item);
 }
+function projectedTakeProfit(p) {
+  const entry = Number(p.entry_price);
+  const target = Number(p.initial_take_price);
+  const quantity = Number(p.quantity);
+  if (!Number.isFinite(entry) || !Number.isFinite(target) || !Number.isFinite(quantity)) return null;
+  return p.side === 'SHORT' ? (entry - target) * quantity : (target - entry) * quantity;
+}
+function projectedTakeProfitCell(p) {
+  const pnl = projectedTakeProfit(p);
+  if (!Number.isFinite(pnl)) return '<td class="muted">-</td>';
+  return `<td class="${pnl >= 0 ? 'pos' : 'neg'}">${formatAmount(pnl)}</td>`;
+}
 function fillPositions(items) {
   document.getElementById('positions').innerHTML = items.map(p => `
-    <tr><td>${symbolCell(p.symbol)}</td><td>${intervalCell(p.interval)}</td><td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${date(p.entry_time)}</td><td>${formatPrice(p.entry_price)}</td><td>${formatPrice(p.liquidation_price)}</td><td>${Number(p.quantity).toFixed(6)}</td><td>${formatAmount(p.entry_margin)}</td><td class="neg">${formatPrice(p.stop_price)}</td><td class="pos">${formatPrice(p.initial_take_price)}</td><td class="pos">${formatPrice(p.latest_take_price)}</td></tr>
-  `).join('') || '<tr><td colspan="11" class="muted">暂无持仓</td></tr>';
+    <tr><td>${symbolCell(p.symbol)}</td><td>${intervalCell(p.interval)}</td><td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${date(p.entry_time)}</td><td>${formatPrice(p.entry_price)}</td><td>${formatPrice(p.liquidation_price)}</td><td>${Number(p.quantity).toFixed(6)}</td><td>${formatAmount(p.entry_margin)}</td><td class="neg">${formatPrice(p.stop_price)}</td><td class="pos">${formatPrice(p.initial_take_price)}</td>${projectedTakeProfitCell(p)}<td class="pos">${formatPrice(p.latest_take_price)}</td></tr>
+  `).join('') || '<tr><td colspan="12" class="muted">暂无持仓</td></tr>';
 }
 function tradeRow(t) {
   return `<tr><td>${symbolCell(t.symbol)}</td><td>${intervalCell(t.interval)}</td><td class="${t.side === 'LONG' ? 'pos' : 'neg'}">${t.side}</td><td>${date(t.entry_time)}</td><td>${date(t.exit_time)}</td><td>${Number(t.entry_price).toFixed(2)}</td><td>${Number(t.exit_price).toFixed(2)}</td><td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${Number(t.pnl).toFixed(2)}</td><td class="${t.pnl_pct >= 0 ? 'pos' : 'neg'}">${Number(t.pnl_pct).toFixed(2)}%</td><td>${t.exit_reason}</td></tr>`;
 }
 function fillTradeRecords(items) {
   document.getElementById('tradeRecords').innerHTML = items.map(tradeRow).join('') || '<tr><td colspan="10" class="muted">暂无交易记录</td></tr>';
-}
-function fillTrades(items) {
-  document.getElementById('trades').innerHTML = items.map(tradeRow).join('') || '<tr><td colspan="10" class="muted">暂无平仓记录</td></tr>';
 }
 function fillEvents(items) {
   document.getElementById('events').innerHTML = items.map(e => `
